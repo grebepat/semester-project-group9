@@ -1,3 +1,1 @@
-# sag mir noch einmal du bist up-to-date...
-
-# ich habe Inhalt gelöscht und neuen content hinzugefügt
+# das ist ein krasses skript welches preprocessing von crazy spatial data macht, weil spatial is special
