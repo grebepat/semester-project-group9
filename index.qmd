@@ -1,6 +1,6 @@
 ---
-title: The title of your Semesterproject
-subtitle: A subtle subtitle
+title: Path of least resistance
+subtitle: or how fast is a c(o)urier?
 author: Patrick Greber, Maurin Huonder
 format:
   html:
