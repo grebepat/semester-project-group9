@@ -1,1 +1,0 @@
-# das ist ein krasses skript welches preprocessing von crazy spatial data macht, weil spatial is special
