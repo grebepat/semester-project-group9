@@ -36,9 +36,8 @@ single_routes <- list()
 all_routes <- data.frame()
 
 
-# create a loop to read in every single gpx-file in the subfolder and extraxt the needed values such as coordinates, elevation and timestamps
+# create a loop to read in every single gpx-file in the subfolder and extract the needed values such as coordinates, elevation and timestamps
 for (file in file_list) {
-  
   # Parse the GPX file using the htmlTreeParse() Function
   # Credits go to: https://www.appsilon.com/post/r-gpx-files
   gpx_parsed <- htmlTreeParse(file = file, useInternalNodes = TRUE)
@@ -49,7 +48,7 @@ for (file in file_list) {
   time <- xpathSApply(doc = gpx_parsed, path = "//time", fun = xmlValue)
   name <- xpathSApply(doc = gpx_parsed, path = "//name", fun = xmlValue)
   
-  # Get Path of the subfolders to extraxt names of subfolders
+  # Get Path of the subfolders to extract names of subfolders
   
   
   # Generate new data frame with extracted values
@@ -71,13 +70,27 @@ for (file in file_list) {
   df_sf <- select(df_sf, id, time, x, y, elevation, geometry)
   
   
-  
-  # Store every iterration into a single data frame and send it to the list single_routes()
+# Store every iteration into a single data frame and send it to the list single_routes()
   single_routes[[file]] <- df_sf
   
-  # Store every iterration into new rows of the existing data frame all_routes()
+# Store every iteration into new rows of the existing data frame all_routes()
   all_routes <- rbind(all_routes, df_sf)
 }
+
+# bind all_routes with activity name
+names <- read_delim("Strava Data Chahan/activities.csv") %>% 
+  select(`AktivitÃ¤ts-ID`, `Name der AktivitÃ¤t`, `AktivitÃ¤tsart`, Dateiname) %>% 
+  rename("id" = `AktivitÃ¤ts-ID`, "Name" = `Name der AktivitÃ¤t`, "Aktivität" = `AktivitÃ¤tsart`)
+
+names <- names %>% 
+  filter(Aktivität == "Radfahrt" & grepl("\\.gpx$", Dateiname))
+
+# change id in all_routes to numeric
+all_routes$id <- as.numeric(all_routes$id)
+
+# join the data
+all_routes <- all_routes %>% 
+  left_join(names)
 
 # save a example route as object
 example_route <- single_routes[["Strava Data Chahan/activities/1836915246.gpx"]]
