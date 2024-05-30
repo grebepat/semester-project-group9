@@ -94,8 +94,9 @@ for (file in file_list) {
     
     # Extract filenames and subfoldernames using gsub() credits go to: https://stackoverflow.com/questions/54082781/extract-portion-of-file-name-using-gsub
   id = gsub('.*/(.*).gpx','\\1', file),
-  messenger = as.factor(gsub(".*/gps_files([^/]+)/.*", "\\1", file))
+  messenger = as.factor(gsub(".*/gps_files_([^/]+)/.*", "\\1", file))
   )
+  
   
   # transform into spatial data frame and project to new coordinate system
   df_sf <- st_as_sf(df, coords = c("lon", "lat"), crs = 4326, remove = FALSE)
@@ -114,11 +115,11 @@ for (file in file_list) {
 }
 
 # Quick overview
-tmap_mode("view")
+tmap_mode("plot")
 tm_shape(single_routes$`gps_files_shared/gps_files_raeubertochter/F1.gpx`) +
-  tm_dots( col = "curier", palette = "seq", border.col = NULL)
+  tm_dots( col = "messenger", palette = "seq", border.col = NULL)
 
-
+?tmap_mode
 
 
 ```
