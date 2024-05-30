@@ -28,8 +28,10 @@ p_install("tidyverse", force = FALSE)
 p_install("rjson", force = FALSE)
 p_install("jsonlite", force = FALSE)
 p_install("leaflet", force = TRUE)
+p_install("shiny", force = TRUE)
 p_install("XML", force = TRUE)
 p_install("lubridate", force = TRUE)
+
 
 library("dplyr")
 library("ggplot2")
@@ -48,6 +50,7 @@ library("jsonlite")
 library("leaflet")
 library("XML")
 library("lubridate")
+library("shiny")
 
 ```
 
@@ -115,11 +118,80 @@ for (file in file_list) {
 }
 
 # Quick overview
-tmap_mode("plot")
-tm_shape(single_routes$`gps_files_shared/gps_files_raeubertochter/F1.gpx`) +
+tmap_mode("view")
+tm_shape(all_routes) +
   tm_dots( col = "messenger", palette = "seq", border.col = NULL)
 
-?tmap_mode
+
+
+```
+
+# Task 2. Import Spatial Data
+
+```{r}
+
+st_layers("basic_data.gpkg")
+
+strassen <- read_sf("gis_files/basic_data.gpkg", "street_network") |> 
+   select(objektart, geom) |> 
+  mutate(
+    objektart = as.factor(objektart),
+    width = as.numeric(substr(objektart, start = 1, stop = 1))
+  ) |> 
+  filter(width > 1)
+  
+
+gebaeude <- read_sf("gis_files/basic_data.gpkg", "housing_footprint") |> 
+   select(objektart, geom) |> 
+  mutate(
+    objektart = as.factor(objektart)
+  )
+
+
+
+p1 <- ggplot() +
+  geom_sf(data = strassen, lwd = strassen$width/50, color = "lightgrey", fill = NA) +
+  scale_linetype_identity() +
+  geom_sf(data = all_routes, color = "yellow", size = 0.001) +
+  theme_void() +
+  theme(
+    plot.background = element_rect(fill = "black"),
+    panel.background = element_rect(fill = "black")
+  )
+
+
+png(file="day1.png", width = 125, height= 116.75, units= "mm", res=1000)
+p1
+dev.off() 
+
+
+
+
+
+
+
+
+ggplot() +
+  geom_sf(data = strassen, lwd = strassen$width/50) +
+  scale_linetype_identity() +
+  geom_sf(data = gebaeude, alpha = 0.5) +
+  scale_fill_manual("black") +
+  theme_void()
+
+
+ggplot() +
+  geom_sf(data = gebaeude) +
+  scale_fill_manual("darkgrey") +
+  theme_void()
+
+
+raeubertochter_map <- leaflet(all_routes) |> 
+  addTiles() |> 
+  addCircleMarkers(lng = ~x,
+                   lat = ~y)
+
+raeubertochter_map
+
 
 
 ```

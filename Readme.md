@@ -62,3 +62,5 @@ The primary challenge is the implementation of resistance factors. The multitude
 1.  Should we combine the street network attributes into a single resistance attribute, or should we keep them separate to identify which attributes significantly influence route choice?
 2.  Is this project feasible given the limited time and resources?
 3.  Other ideas for this data?
+4. Rauf / Runter Fahren? Unterschiedliche Routenwahl bez. Geschwindigkeit
+5. Mit Datenmengen umgehen, gerade gpkg von swisstopo sehr gross, selbst wenn zugeschnitten
