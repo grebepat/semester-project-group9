@@ -31,8 +31,9 @@ p_install("leaflet", force = TRUE)
 p_install("shiny", force = TRUE)
 p_install("XML", force = TRUE)
 p_install("lubridate", force = TRUE)
+p_install("ggh4x", force = TRUE)
 
-
+library("ggh4x")
 library("dplyr")
 library("ggplot2")
 library("tidyr")
@@ -51,6 +52,7 @@ library("leaflet")
 library("XML")
 library("lubridate")
 library("shiny")
+
 
 ```
 
@@ -119,7 +121,7 @@ for (file in file_list) {
 
 # Quick overview
 tmap_mode("view")
-tm_shape(all_routes) +
+tm_shape(single_routes$`gps_files_shared/gps_files_raeubertochter/F1.gpx`) +
   tm_dots( col = "messenger", palette = "seq", border.col = NULL)
 
 
@@ -163,6 +165,41 @@ p1 <- ggplot() +
 png(file="day1.png", width = 125, height= 116.75, units= "mm", res=1000)
 p1
 dev.off() 
+
+
+
+
+all_routes_lines <- all_routes |> 
+  summarise(do_union = TRUE) |> 
+  st_cast("LINESTRING")
+
+plot(all_routes_lines)
+
+p2 <- ggplot() +
+  geom_point(data = all_routes, aes(x, y), size = 0.01) +
+  geom_path()+
+  labs(y="y", x="x") +
+  scale_x_continuous(limits = c(2678000, max(all_routes$x))) +
+  scale_y_continuous(limits = c(1242000, max(all_routes$y))) +
+  guides(y = "axis_truncated",
+         x = "axis_truncated") +
+  coord_fixed(clip = "off") +
+   theme_classic() +
+  theme(axis.title.y = element_text(size = 6, margin = margin(t = 0, r = 15, b = 0, l = 0)),
+        axis.title.x = element_text(size = 6, margin = margin(t = 10, r = 0, b = 0, l = 0)),
+        axis.line = element_line(size=0.3),
+        axis.text.x = element_text(size = 6, margin = margin(t = 7.5, r = 0, b = 0, l = 0)),
+        axis.text.y = element_text(size = 6, margin = margin(t = 0, r = 7.5, b = 0, l = 0))) 
+
+
+
+png(file="p2.png", width = 175, height= 175, units= "mm", res=1000)
+p2
+dev.off() 
+
+
+
+
 
 
 
