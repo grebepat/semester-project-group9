@@ -92,14 +92,14 @@ for (file in file_list) {
   # Generate new data frame with extracted values
   df <- data.frame(
     name = name,
-    time = time[-1],
+    time = as.POSIXct(time[-1], format = "%Y-%m-%dT%H:%M:%OSZ"),
     lat = as.numeric(coords["lat", ]),
     lon = as.numeric(coords["lon", ]),
     elevation = as.numeric(elevation),
-    
-    # Extract filenames and subfoldernames using gsub() credits go to: https://stackoverflow.com/questions/54082781/extract-portion-of-file-name-using-gsub
-  id = gsub('.*/(.*).gpx','\\1', file),
-  messenger = as.factor(gsub(".*/gps_files_([^/]+)/.*", "\\1", file))
+    messenger = as.factor(gsub(".*/gps_files_([^/]+)/.*", "\\1", file)),
+ 
+     # Extract filenames and subfoldernames using gsub() credits go to:  https://stackoverflow.com/questions/54082781/extract-portion-of-file-name-using-gsub
+  id = as.factor(paste(gsub('.*/(.*).gpx','\\1', file), gsub(".*/gps_files_([^/]+)/.*", "\\1", file), sep = "_"))
   )
   
   
@@ -125,10 +125,164 @@ tm_shape(single_routes$`gps_files_shared/gps_files_raeubertochter/F1.gpx`) +
   tm_dots( col = "messenger", palette = "seq", border.col = NULL)
 
 
+```
+
+# Task 2: Analysing sampling regime of all messengers
+
+```{r}
+
+all_routes_seg <- all_routes
+
+#If a larger sampling grid is needed: selecting every 10th row from  movement data
+
+#all_routes <- all_routes[seq(from = 1, to = #nrow(all_routes), by = 5), ]
+
+
+all_routes_seg <- all_routes_seg |> # calculate rowwise time difference
+    group_by(id) |> 
+    mutate(
+    time_difference = as.numeric(difftime(time, lag(time), units = "secs"))) |>
+    ungroup()
+
+
+# How do the time difference differ between days and messengers?
+
+all_routes_seg |> 
+  group_by(id) |> 
+  summarise(
+    mean <- mean(time_difference, na.rm = T)
+    )
+
+ggplot(all_routes_seg, aes(x = time_difference)) +
+  geom_histogram(binwidth = 2) +
+  scale_y_log10() +
+  labs(x = "Time Difference", y = "Count (Log Scale)") +
+  ggtitle("Histogram of Time Differences with Log Y Axis") +
+  facet_wrap(all_routes_seg$id) +
+  theme_minimal()
+
+
+# Both with similar but slightly different sampling regimes, raeubertochter with an intervall of 1 second- It seems that static time is already removed..
+
+# Donner with more variation between fixes, but still short intervalls, might need another segmentation...
+
+# First we try the same segmentation for all messenegrs
+
+
+all_routes_seg <- all_routes_seg |> 
+   group_by(id) |> 
+   mutate(
+        nMinus2 = difftime(time, lag(time, 2)), 
+        nMinus1 = difftime(time, lag(time,1)),  
+        nPlus1  = difftime(lead(time, 1), time), 
+        nPlus2  = difftime(lead(time, 2), time)  
+    )
+
+
+all_routes_seg <- all_routes_seg |> # calculate rowwise mean distance per messenger
+    group_by(id) |> 
+    rowwise() |>
+    mutate(
+        timeMean = mean(c(nMinus2, nMinus1, nPlus1, nPlus2))
+    ) |>
+    ungroup()
+
+
+# create a new column static, based on time_difference (over 10s time difference)
+all_routes_seg <- all_routes_seg |> 
+  mutate(
+    new_segment = timeMean > 10
+  )
+
+# it assigns unique IDs based on the column static
+rle_id <- function(vec) {
+    x <- rle(vec)$lengths
+    as.factor(rep(seq_along(x), times = x))
+}
+
+all_routes_seg <- all_routes_seg |>
+    mutate(temp_id = rle_id(new_segment)) |> 
+    filter(!new_segment)
+
+# remove segments shorter than a minunte
+
+all_routes_seg <- all_routes_seg |> 
+  group_by(temp_id) |> 
+  mutate(duration = difftime(max(time), min(time))
+  ) |> 
+  filter(!duration < 60) |> 
+  ungroup()
+
+# Adssing new segment_id starting at one, credits to: https://stackoverflow.com/questions/39650511/r-group-by-variable-and-then-assign-a-unique-id
+
+all_routes_seg <- all_routes_seg |> 
+  group_by(temp_id, messenger) |> 
+  mutate(segment_id = as_factor(cur_group_id())) |> 
+  ungroup() |> 
+  select(-temp_id)
+
+# visualize segments
+
+ggplot(all_routes_seg,aes(x, y, color = segment_id)) +
+    geom_path() +
+    scale_fill_brewer(palette = "Set3") +
+    geom_point() +
+    coord_fixed() +
+    theme(legend.position = "none")+
+    labs(title = "Deliveries", subtitle="Segmentation set at time_difference > 10s \nSegments < 60s removed") 
+
+
+# It already looks really good????
+
+
+all_routes_seg |> 
+  group_by(messenger) |> 
+  summarise(length(unique(segment_id)))
+
+
+raeubertochter <- filter(all_routes_seg, messenger == "raeubertochter")
+
+donner <- filter(all_routes_seg, messenger == "donner")
+
+
+ggplot(donner,aes(x, y, color = segment_id)) +
+    geom_path() +
+    geom_point() +
+    scale_fill_brewer(palette = "Set1") +
+    coord_fixed() +
+    theme(legend.position = "none")+
+    labs(title = "Deliveries", subtitle="Segmentation set at time_difference > 10s \nSegments < 60s removed")  
+
+ggplot(raeubertochter,aes(x, y, color = segment_id)) +
+    geom_path() +
+    geom_point() +
+    scale_fill_brewer(palette = "Set1") +
+    coord_fixed() +
+    theme(legend.position = "none")+
+    labs(title = "Deliveries", subtitle="Segmentation set at time_difference > 10s \nSegments < 60s removed")  
+
 
 ```
 
-# Task 2. Import Spatial Data
+# Task 3: Start and Ending Points
+
+```{r}
+
+
+# Credits to: https://stackoverflow.com/questions/31528981/select-first-and-last-row-from-grouped-data
+
+
+start_end <- all_routes_seg |> 
+  group_by(segment_id) |> 
+  filter(row_number()==1 | row_number()==n()) |> 
+  mutate(
+    position = rep(c("start", "end"), length.out = n()),
+    point_type = paste()
+  )
+
+```
+
+# Task 4: Import Spatial Data
 
 ```{r}
 
@@ -175,7 +329,7 @@ all_routes_lines <- all_routes |>
 
 plot(all_routes_lines)
 
-p2 <- ggplot() +
+ggplot() +
   geom_point(data = all_routes, aes(x, y), size = 0.01) +
   geom_path()+
   labs(y="y", x="x") +
@@ -232,4 +386,5 @@ raeubertochter_map
 
 
 ```
+
 
