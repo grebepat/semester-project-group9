@@ -32,6 +32,9 @@ p_install("shiny", force = TRUE)
 p_install("XML", force = TRUE)
 p_install("lubridate", force = TRUE)
 p_install("ggh4x", force = TRUE)
+p_install("forcats", force = TRUE)
+p_install("purr", force = TRUE)
+p_install("viridis", force = TRUE)
 
 library("ggh4x")
 library("dplyr")
@@ -40,7 +43,6 @@ library("tidyr")
 library("sf")
 library("terra")
 library("tmap")
-library("zoo")
 library("zoo")
 library("units")
 library("plotly")
@@ -52,12 +54,14 @@ library("leaflet")
 library("XML")
 library("lubridate")
 library("shiny")
-
+library("forcats")
+library("purr")
+library("viridis") 
 
 ```
 
 
-# Task 1: Import your data
+# Task 1: Import Express: Bringing GPS Data Onboard
 
 Folgend werden alle .gpx-Files aus dem Ordner *GPS_Daten* eingelesen. Aus den .gpx-Files werden die Koordinaten herausgelesen und jede gefahrene Route / Aktivität in einem neuen Dataframe abgespeichert. Die Dataframes landen alle in einer Liste `single_routes` und können über diese abgerufen und dargestellt werden.In einer weiteren Variate werden alle Daten in einen einzigen Data Frame verpackt `all_routes`.
 
@@ -65,100 +69,86 @@ Folgend werden alle .gpx-Files aus dem Ordner *GPS_Daten* eingelesen. Aus den .g
 
 
 # generate a list of all filenames including the path from the subfolder they are stored in
-file_list <- list.files("gps_files_shared", recursive = TRUE, pattern = "\\.gpx$", full.names = TRUE)
+file <- list.files("gps_files_shared", recursive = TRUE, pattern = "\\.gpx$", full.names = TRUE)
 
-# Get Path of the subfolders to extraxt names of subfolders and / or filenames
-# Credits go to: https://stackoverflow.com/questions/54082781/extract-portion-of-file-name-using-gsub
-file_name <- gsub('.*/(.*).gpx','\\1', file_list)
-
-# creating empty vessels for our soon to be imported data using a for loop
-single_routes <- list()
-all_routes <- data.frame()
-
-# create a for loop to read in every single gpx file in the subfolder and extraxt the needed values such as coordinates, elevation and timestamps
-for (file in file_list) {
-  
-  # Parse the GPX file using the htmlTreeParse() Function
-  # Credits go to: https://www.appsilon.com/post/r-gpx-files
-  gpx_parsed <- htmlTreeParse(file = file, useInternalNodes = TRUE)
-  
-  # Extract data from the parsed GPX file
-  coords <- xpathSApply(doc = gpx_parsed, path = "//trkpt", fun = xmlAttrs)
-  elevation <- xpathSApply(doc = gpx_parsed, path = "//trkpt/ele", fun = xmlValue)
-  time <- xpathSApply(doc = gpx_parsed, path = "//time", fun = xmlValue)
-  name <- xpathSApply(doc = gpx_parsed, path = "//name", fun = xmlValue)
-  
- 
-  # Generate new data frame with extracted values
-  df <- data.frame(
-    name = name,
-    time = as.POSIXct(time[-1], format = "%Y-%m-%dT%H:%M:%OSZ"),
-    lat = as.numeric(coords["lat", ]),
-    lon = as.numeric(coords["lon", ]),
-    elevation = as.numeric(elevation),
-    messenger = as.factor(gsub(".*/gps_files_([^/]+)/.*", "\\1", file)),
- 
-     # Extract filenames and subfoldernames using gsub() credits go to:  https://stackoverflow.com/questions/54082781/extract-portion-of-file-name-using-gsub
-  id = as.factor(paste(gsub('.*/(.*).gpx','\\1', file), gsub(".*/gps_files_([^/]+)/.*", "\\1", file), sep = "_"))
-  )
-  
-  
-  # transform into spatial data frame and project to new coordinate system
-  df_sf <- st_as_sf(df, coords = c("lon", "lat"), crs = 4326, remove = FALSE)
-  df_sf <- st_transform(df_sf, crs = 2056)
-  df_sf$x <- st_coordinates(df_sf)[,1]
-  df_sf$y <- st_coordinates(df_sf)[,2]
-  df_sf <- select(df_sf, id, messenger, name, time, x, y, elevation, geometry)
-  
- 
-  # Store every iterration into a singel data frame and send it to the list single_routes()
-  single_routes[[file]] <- df_sf
-  
-  # Store every iterration into new rows of the existing data frame all_routes()
-  all_routes <- rbind(all_routes, df_sf)
-  
+# Function to extract messenger and id from file path
+extract_info <- function(file) {
+  messenger <- as.factor(gsub(".*/gps_files_([^/]+)/.*", "\\1", file))
+  id <- as.factor(paste(gsub('.*/(.*).gpx','\\1', file), gsub(".*/gps_files_([^/]+)/.*", "\\1", file), sep = "_"))
+  list(messenger = messenger, id = id)
 }
 
+# Function to process each file
+process_file <- function(file) {
+  df <- st_read(file, "track_points")
+  
+  info <- extract_info(file)
+  df$messenger <- info$messenger
+  df$id <- info$id
+  
+  df_sf <- st_as_sf(df, coords = c("lon", "lat"), crs = 4326, remove = FALSE)
+  df_sf <- st_transform(df_sf, crs = 2056)
+  df_sf$shift <- gsub('.*/(.*).gpx','\\1', file)
+  df_sf$x <- st_coordinates(df_sf)[,1]
+  df_sf$y <- st_coordinates(df_sf)[,2]
+  df_sf <- select(df_sf, id, messenger, shift, time, x, y, ele, geometry)
+  
+  df_sf$origin <- file
+  df_sf
+}
+
+# Apply the function to each file using purrr's map function
+single_routes <- purrr::map(file, process_file)
+
+# Combine all results
+all_routes <- do.call(rbind, single_routes)
+
+raeubertochter_raw <- filter(all_routes, messenger == "raeubertochter")
+donner_raw <- filter(all_routes, messenger == "donner")
+
+
+
 # Quick overview
-tmap_mode("view")
-tm_shape(single_routes$`gps_files_shared/gps_files_raeubertochter/F1.gpx`) +
+tmap_mode("plot")
+tm_shape(single_routes[[2]]) +
   tm_dots( col = "messenger", palette = "seq", border.col = NULL)
 
 
 ```
 
-# Task 2: Analysing sampling regime of all messengers
+# Task 2: Signal Sync: Assessing Sampling Intervals Across Messenger GPS Systems
 
 ```{r}
 
-all_routes_seg <- all_routes
-
 #If a larger sampling grid is needed: selecting every 10th row from  movement data
-
 #all_routes <- all_routes[seq(from = 1, to = #nrow(all_routes), by = 5), ]
 
-
-all_routes_seg <- all_routes_seg |> # calculate rowwise time difference
+# calculate rowwise time difference
+all_routes <- all_routes |> 
     group_by(id) |> 
     mutate(
     time_difference = as.numeric(difftime(time, lag(time), units = "secs"))) |>
     ungroup()
 
 
-# How do the time difference differ between days and messengers?
-
-all_routes_seg |> 
+# How do the time difference differ between messengers?
+all_routes |> 
   group_by(id) |> 
+  filter(time_difference <= 30) |> # remove outliers to get a clearer view on the average sampling intervall
   summarise(
     mean <- mean(time_difference, na.rm = T)
     )
 
-ggplot(all_routes_seg, aes(x = time_difference)) +
+# max value between two fixes, in min
+max(all_routes$time_difference, na.rm = T) / 60
+
+
+ggplot(all_routes, aes(x = time_difference)) +
   geom_histogram(binwidth = 2) +
   scale_y_log10() +
-  labs(x = "Time Difference", y = "Count (Log Scale)") +
+  labs(x = "Time Difference in sec.", y = "Count (Log Scale)") +
   ggtitle("Histogram of Time Differences with Log Y Axis") +
-  facet_wrap(all_routes_seg$id) +
+  facet_wrap(all_routes$id) +
   theme_minimal()
 
 
@@ -166,10 +156,17 @@ ggplot(all_routes_seg, aes(x = time_difference)) +
 
 # Donner with more variation between fixes, but still short intervalls, might need another segmentation...
 
-# First we try the same segmentation for all messenegrs
+```
+
+# Task 3: From Dots to Drops: Segmenting GPS Fixes into Deliveries
+
+```{r}
 
 
-all_routes_seg <- all_routes_seg |> 
+# First we try the same segmentation method for all messenegrs
+
+# create a moving time window
+all_routes_seg <- all_routes |> 
    group_by(id) |> 
    mutate(
         nMinus2 = difftime(time, lag(time, 2)), 
@@ -188,10 +185,10 @@ all_routes_seg <- all_routes_seg |> # calculate rowwise mean distance per messen
     ungroup()
 
 
-# create a new column static, based on time_difference (over 10s time difference)
+# create a new column static, based on time_difference (over 20s time difference)
 all_routes_seg <- all_routes_seg |> 
   mutate(
-    new_segment = timeMean > 10
+    new_segment = timeMean > 20
   )
 
 # it assigns unique IDs based on the column static
@@ -200,21 +197,20 @@ rle_id <- function(vec) {
     as.factor(rep(seq_along(x), times = x))
 }
 
+# removes static rows
 all_routes_seg <- all_routes_seg |>
     mutate(temp_id = rle_id(new_segment)) |> 
     filter(!new_segment)
 
-# remove segments shorter than a minunte
-
+# remove segments shorter than two minuntes
 all_routes_seg <- all_routes_seg |> 
   group_by(temp_id) |> 
   mutate(duration = difftime(max(time), min(time))
   ) |> 
-  filter(!duration < 60) |> 
+  filter(!duration < 120) |> 
   ungroup()
 
 # Adssing new segment_id starting at one, credits to: https://stackoverflow.com/questions/39650511/r-group-by-variable-and-then-assign-a-unique-id
-
 all_routes_seg <- all_routes_seg |> 
   group_by(temp_id, messenger) |> 
   mutate(segment_id = as_factor(cur_group_id())) |> 
@@ -222,12 +218,11 @@ all_routes_seg <- all_routes_seg |>
   select(-temp_id)
 
 # visualize segments
-
 ggplot(all_routes_seg,aes(x, y, color = segment_id)) +
-    geom_path() +
     scale_fill_brewer(palette = "Set3") +
     geom_point() +
     coord_fixed() +
+    theme_minimal() +
     theme(legend.position = "none")+
     labs(title = "Deliveries", subtitle="Segmentation set at time_difference > 10s \nSegments < 60s removed") 
 
@@ -240,45 +235,133 @@ all_routes_seg |>
   summarise(length(unique(segment_id)))
 
 
-raeubertochter <- filter(all_routes_seg, messenger == "raeubertochter")
+raeubertochter_seg <- filter(all_routes_seg, messenger == "raeubertochter")
 
-donner <- filter(all_routes_seg, messenger == "donner")
+donner_seg <- filter(all_routes_seg, messenger == "donner")
 
 
-ggplot(donner,aes(x, y, color = segment_id)) +
+ggplot(donner_seg, aes(x, y, color = segment_id)) +
     geom_path() +
     geom_point() +
     scale_fill_brewer(palette = "Set1") +
     coord_fixed() +
     theme(legend.position = "none")+
-    labs(title = "Deliveries", subtitle="Segmentation set at time_difference > 10s \nSegments < 60s removed")  
+    labs(title = "Deliveries", subtitle="Segmentation set at time_difference > 10s \nSegments < 120s removed")  
 
-ggplot(raeubertochter,aes(x, y, color = segment_id)) +
+ggplot(raeubertochter_seg, aes(x, y, color = segment_id)) +
     geom_path() +
     geom_point() +
     scale_fill_brewer(palette = "Set1") +
     coord_fixed() +
     theme(legend.position = "none")+
-    labs(title = "Deliveries", subtitle="Segmentation set at time_difference > 10s \nSegments < 60s removed")  
+    labs(title = "Deliveries", subtitle="Segmentation set at time_difference > 10s \nSegments < 120s removed")  
 
 
 ```
 
-# Task 3: Start and Ending Points
+# Task 4: Lost in Transit: Tackling Tunnel GPS Blackouts for Bike Messenger
 
 ```{r}
 
+all_routes_seg_tunnel <- all_routes_seg
 
-# Credits to: https://stackoverflow.com/questions/31528981/select-first-and-last-row-from-grouped-data
-
-
-start_end <- all_routes_seg |> 
+first_last_points <- all_routes_seg_tunnel |> 
   group_by(segment_id) |> 
-  filter(row_number()==1 | row_number()==n()) |> 
+  slice(c(1, n())) |> 
+  ungroup()
+
+# Create a buffer around the tunnel entry and exit
+tunnel_exit <- st_sfc(st_point(c(2682368, 1246996)), crs = 2056)
+tunnel_entry <- st_sfc(st_point(c(2682592, 1246751)), crs = 2056)
+
+# tunnel_points <- st_sfc(tunnel_entry, tunnel_exit, crs = 2056)
+buffer_entry <- st_buffer(tunnel_entry, dist = 50)
+buffer_exit <- st_buffer(tunnel_exit, dist = 50)
+
+
+# Identify segments within the buffer
+first_last_points <- first_last_points |> 
   mutate(
-    position = rep(c("start", "end"), length.out = n()),
-    point_type = paste()
-  )
+    intersect_start = sapply(st_intersects(geometry, buffer_entry, sparse = FALSE), any),
+    intersect_end = sapply(st_intersects(geometry, buffer_exit, sparse = FALSE), any)
+  ) |> 
+  filter(intersect_start | intersect_end)
+
+# Calculate time difference between end of one segment and start of the next
+first_last_points <- first_last_points |> 
+  arrange(segment_id, time) |> 
+  mutate(time_diff = time - lag(time))
+
+# Match segments where time difference is less than 2 minutes
+matched_segments <- first_last_points |> 
+  filter(time_diff <= 120 | is.na(time_diff) ) |> 
+  mutate(new_segment_id = lag(segment_id)) |> 
+  select(x,y,geometry,time_diff, segment_id, new_segment_id)
+
+# create a table with matching segment starting / endpoints
+lookup_table <- matched_segments |> 
+  filter(!is.na(new_segment_id) & segment_id != new_segment_id) |> 
+  select(segment_id, new_segment_id)  |> 
+  distinct()
+
+# Replace segment_id in all_routes_seg using lookup_vector, credits go to: https://stackoverflow.com/questions/35636315/replace-values-in-a-dataframe-based-on-lookup-table
+lookup_vector <- setNames(lookup_table$new_segment_id, lookup_table$segment_id)
+
+all_routes_seg_tunnel$segment_id_new <- ifelse(all_routes_seg_tunnel$segment_id %in% names(lookup_vector), 
+                                    lookup_vector[match(all_routes_seg_tunnel$segment_id, names(lookup_vector))], 
+                                    all_routes_seg_tunnel$segment_id)
+
+
+all_routes_seg_tunnel <- all_routes_seg_tunnel |> 
+  group_by(segment_id_new, messenger) |> 
+  mutate(segment_id_cor = as_factor(cur_group_id())) |> 
+  select(-segment_id, -segment_id_new) |> 
+  ungroup()
+
+
+raeubertochter_cor <- filter(all_routes_seg_tunnel, messenger == "raeubertochter")
+
+donner_cor <- filter(all_routes_seg_tunnel, messenger == "donner")
+
+
+ggplot(donner_cor,aes(x, y, color = segment_id_cor)) +
+    geom_path() +
+    geom_point() +
+    scale_fill_brewer(palette = "Set1") +
+    coord_fixed() +
+    theme(legend.position = "none")+
+    labs(title = "Deliveries", subtitle="Segmentation set at time_difference > 10s \nSegments < 120s removed \nTunnel Challenge incl.")  
+
+ggplot(raeubertochter_cor,aes(x, y, color = segment_id_cor)) +
+    geom_path() +
+    geom_point() +
+    scale_fill_brewer(palette = "Set1") +
+    coord_fixed() +
+    theme(legend.position = "none")+
+    labs(title = "Deliveries", subtitle="Segmentation set at time_difference > 10s \nSegments < 120s removed \nTunnel Challenge incl.")  
+  
+
+#################################################################################
+
+
+## Interpolating!!! Should be done before merging the two objects. maybe it's better to interpolate based on the data frame matched_segments and then repeat the segmentation... cleaner version??
+
+
+line <- st_cast(st_combine(matched_segments$geometry), "LINESTRING")
+
+# Interpolate points along the line
+interpolated_pts <- st_segmentize(line, units::set_units(5, "m"))
+
+plot(interpolated_pts)
+?st_cast
+
+?st_segmentize
+
+
+#################################################################################
+
+
+
 
 ```
 
@@ -286,29 +369,203 @@ start_end <- all_routes_seg |>
 
 ```{r}
 
+
 st_layers("basic_data.gpkg")
 
-strassen <- read_sf("gis_files/basic_data.gpkg", "street_network") |> 
+streets <- read_sf("gis_files/basic_data.gpkg", "street_network") |> 
    select(objektart, geom) |> 
   mutate(
     objektart = as.factor(objektart),
-    width = as.numeric(substr(objektart, start = 1, stop = 1))
+    width = as.numeric(substr(objektart, start = 1, stop = 1)),
+    width_scaled = as.numeric(substr(objektart, start = 1, stop = 1)) *1000
   ) |> 
+  na.omit() |> 
   filter(width > 1)
   
 
-gebaeude <- read_sf("gis_files/basic_data.gpkg", "housing_footprint") |> 
+
+housing <- read_sf("gis_files/basic_data.gpkg", "housing_footprint") |> 
    select(objektart, geom) |> 
   mutate(
     objektart = as.factor(objektart)
   )
 
 
+surface <- read_sf("gis_files/basic_data.gpkg", "surface_type") |> 
+   select(art, geom) |> 
+  mutate(
+    art = as.factor(art)) |> 
+ filter(art == "fliessendes Gewässer" | art == "stehendes Gewässer" | art == "Strasse, Weg" | art == "Verkehrsinsel") |> 
+  na.omit()
 
-p1 <- ggplot() +
-  geom_sf(data = strassen, lwd = strassen$width/50, color = "lightgrey", fill = NA) +
+summary(surface$art)
+
+```
+
+
+
+## Map Matching
+
+```{r}
+
+library(sf)
+library(tmap)
+
+
+# since we want to find the closest location on the road over ALL roads
+# we need to create a union of the roads first.
+street_network <- st_union(streets)
+
+
+
+# Let's assume 'gps_locations' are your existing points
+# gps_locations <- ...
+
+# Now we can get the nearest point for each GPS location
+nearest <- st_nearest_points(all_routes_seg_tunnel, street_network)
+
+# The output is a line for each point
+# Now we need convert the output from LINE to POINT. 
+# This doubles the number of features
+near_p <- st_cast(nearest, "POINT")
+
+# now we subset the points. Even numbers are the new, mapmatched points.
+near_to <- near_p[c(FALSE,TRUE)]
+
+# Update the geometry of the original points with the new locations
+st_geometry(all_routes_seg_tunnel) <- st_geometry(near_to)
+
+tmap_mode("view")
+tm_shape(street_network, bbox = extent) + tm_lines() +
+  tm_shape(nearest) + tm_lines(lty = 3) +
+ 
+  tm_shape(all_routes_seg_tunnel$geometry) + tm_dots(col = "red")
+
+
+?st_cast
+
+
+```
+
+# Visualizations for the presentation
+
+```{r}
+
+
+# Define the coordinates of the polygon
+coords <- rbind(c(2681695, 1247822), c(2683188, 1247822), c(2683188, 1246616), c(2681695, 1246616), c(2681695, 1247822))
+
+# Create a polygon
+polygon <- st_polygon(list(coords))
+
+# Convert to spatial object
+extent <- st_sfc(polygon, crs = 2056)
+
+
+housing <- st_intersection(housing, extent)
+streets <- st_intersection(streets, extent)
+surface <- st_intersection(surface, extent)
+
+raeubertochter_raw <- st_intersection(raeubertochter_raw, extent)
+raeubertochter_seg <- raeubertochter_seg |> 
+  st_intersection(extent) |> 
+  mutate(
+    segment_id = as.numeric(segment_id),
+    segment_id = as.factor(segment_id)
+  )
+
+raeubertochter_cor <- raeubertochter_cor |> 
+  st_intersection(extent) |> 
+  mutate(
+    segment_id_cor = as.numeric(segment_id_cor),
+    segment_id_cor = as.factor(segment_id_cor)
+  )
+
+
+
+
+my_palette <- c("Acker, Wiese, Weide" = "white", "Bahngebiet" = "white", "befestigte Fläche"  = "white", "bestockte Fläche" = "white", "fliessendes Gewässer" = "white", "Flugplatz" = "white", "Gartenanlage" = "white", "Gebäude" = "white", "geschlossener Wald" = "white", "Hoch-, Flachmoor" = "white", "humusierte Fläche" = "white", "Intensivkultur" = "white", "Reben" = "white", "Schilfgürtel" = "white", "stehendes Gewässer" = "white", "Strasse, Weg" = "white", "Trottoir" = "white", "Verkehrsinsel" = "white", "Wasserbecken" = "white") 
+                
+
+tm1 <- tm_shape(surface, bbox = extent) +
+  tm_polygons(border.col = NULL, col = "art", palette = my_palette, legend.show = F, ) +
+tm_shape(housing, bbox = extent) +
+  tm_polygons(col = "grey16", border.col = "white", lwd = 0.5) +
+tm_shape(streets, bbox = extent) +
+  tm_lines(lwd = "width", scale = 2.5, legend.lwd.show = FALSE) +
+tm_layout(frame = FALSE) +
+  tm_basemap(server = NULL)
+
+tmap_save(tm1, "overview.png", width = 250, height = 200, dpi = 1000, units = "mm")
+
+
+
+subset_data <- raeubertochter_raw[seq(1, nrow(raeubertochter_raw), by = 2), ]
+
+tm3 <- tm_shape(streets, bbox = extent) +
+  tm_lines(lwd = "width", scale = 2.5, legend.lwd.show = FALSE) +
+  tm_shape(housing, bbox = extent) +
+  tm_polygons(col = "grey16", border.col = "white", lwd = 0.5) +
+tm_shape(subset_data, bbox = extent) +
+  tm_symbols(size = 0.3, col = "red", palette = "Set3", alpha = 0.75, border.col = "NA") +
+  tm_layout(frame = FALSE) 
+
+tmap_save(tm3, "raeubertochter_raw.png", width = 250, height = 200, dpi = 1000, units = "mm")
+
+
+
+subset_data2 <- raeubertochter_seg[seq(1, nrow(raeubertochter_seg), by = 2), ]
+
+tm4 <- tm_shape(streets, bbox = extent) +
+  tm_lines(lwd = "width", scale = 2.5, legend.lwd.show = FALSE) +
+  tm_shape(housing, bbox = extent) +
+  tm_polygons(col = "grey16", border.col = "white", lwd = 0.5) +
+tm_shape(subset_data2, bbox = extent) +
+  tm_symbols(size = 0.25, col = "segment_id", alpha = 0.9, border.col = "NA", legend.col.show = F, palette = "Spectral") +
+  tm_layout(frame = FALSE) 
+
+tmap_save(tm4, "raeubertochter_seg.png", width = 250, height = 200, dpi = 1000, units = "mm")
+
+
+
+
+tm5 <- tm_shape(streets, bbox = extent) +
+  tm_lines(lwd = "width", scale = 2.5, legend.lwd.show = FALSE) +
+  tm_shape(housing, bbox = extent) +
+  tm_polygons(col = "grey16", border.col = "white", lwd = 0.5) +
+tm_shape(buffer_entry) +
+tm_polygons(col = "red", border.col = "red", lwd = 0.5, alpha = 0.5) +
+tm_shape(buffer_exit) +
+ tm_polygons(col = "red", border.col = "red", lwd = 0.5, alpha = 0.5)+
+  tm_layout(frame = FALSE) +
+ tm_shape(first_last_points, bbox = extent) +
+  tm_symbols(size = 0.75, col = "gold", alpha = 1, border.col = "gold", legend.col.show = F) 
+#tm_shape(subset_data2, bbox = extent) +
+# tm_symbols(size = 0.25, col = "segment_id", alpha = 0.75, border.col = "NA", legend.col.show = F) 
+  
+tmap_save(tm5, "overlay.png", width = 250, height = 200, dpi = 1000, units = "mm")
+
+
+
+subset_data3 <- raeubertochter_cor[seq(1, nrow(raeubertochter_cor), by = 2), ]
+
+tm6 <- tm_shape(streets, bbox = extent) +
+  tm_lines(lwd = "width", scale = 2.5, legend.lwd.show = FALSE) +
+    tm_shape(housing, bbox = extent) +
+  tm_polygons(col = "grey16", border.col = "white", lwd = 0.5) +
+tm_shape(subset_data3, bbox = extent) +
+  tm_symbols(size = 0.25, col = "segment_id_cor", alpha = 0.9, border.col = "NA", legend.col.show = F, palette = "Spectral") +
+  tm_layout(frame = FALSE) 
+
+tmap_save(tm6, "merged.png", width = 250, height = 200, dpi = 1000, units = "mm")
+
+
+
+
+ggplot() +
+  geom_sf(data = streets, lwd = streets$width/50, color = "lightgrey", fill = NA) +
   scale_linetype_identity() +
-  geom_sf(data = all_routes, color = "yellow", size = 0.001) +
+  geom_sf(data = all_routes_seg_tunnel, color = "yellow", size = 0.001) +
   theme_void() +
   theme(
     plot.background = element_rect(fill = "black"),
@@ -322,22 +579,18 @@ dev.off()
 
 
 
+# visualize two shifts
 
-all_routes_lines <- all_routes |> 
-  summarise(do_union = TRUE) |> 
-  st_cast("LINESTRING")
-
-plot(all_routes_lines)
 
 ggplot() +
-  geom_point(data = all_routes, aes(x, y), size = 0.01) +
-  geom_path()+
+  geom_point(data = raeubertochter_raw, aes(x, y), size = 0.01) +
+  #geom_path(data = raeubertochter, aes(x, y)) +
   labs(y="y", x="x") +
-  scale_x_continuous(limits = c(2678000, max(all_routes$x))) +
-  scale_y_continuous(limits = c(1242000, max(all_routes$y))) +
+  scale_y_continuous(limits = c(1246000, 1250000)) +
+  scale_x_continuous(limits = c(min(raeubertochter_raw$x), max(raeubertochter_raw$x))) +
   guides(y = "axis_truncated",
          x = "axis_truncated") +
-  coord_fixed(clip = "off") +
+ coord_fixed(clip = "off") +
    theme_classic() +
   theme(axis.title.y = element_text(size = 6, margin = margin(t = 0, r = 15, b = 0, l = 0)),
         axis.title.x = element_text(size = 6, margin = margin(t = 10, r = 0, b = 0, l = 0)),
@@ -346,16 +599,48 @@ ggplot() +
         axis.text.y = element_text(size = 6, margin = margin(t = 0, r = 7.5, b = 0, l = 0))) 
 
 
+ggplot() +
+  geom_point(data = raeubertochter_cor, aes(x, y, color = segment_id_cor), size = 0.01) +
+  #geom_path(data = raeubertochter, aes(x, y)) +
+  labs(y="y", x="x") +
+  scale_y_continuous(limits = c(1246000, 1250000)) +
+  scale_x_continuous(limits = c(min(raeubertochter_cor$x), max(raeubertochter_cor$x))) +
+  guides(y = "axis_truncated",
+         x = "axis_truncated") +
+ coord_fixed(clip = "off") +
+   theme_classic() +
+  theme(axis.title.y = element_text(size = 6, margin = margin(t = 0, r = 15, b = 0, l = 0)),
+        axis.title.x = element_text(size = 6, margin = margin(t = 10, r = 0, b = 0, l = 0)),
+        axis.line = element_line(size=0.3),
+        axis.text.x = element_text(size = 6, margin = margin(t = 7.5, r = 0, b = 0, l = 0)),
+        axis.text.y = element_text(size = 6, margin = margin(t = 0, r = 7.5, b = 0, l = 0)),
+        legend.position = "none") 
 
-png(file="p2.png", width = 175, height= 175, units= "mm", res=1000)
+
+
+
+png(file="shifts.png", width = 200, height= 175, units= "mm", res=1000)
 p2
 dev.off() 
 
+# visualize two shifts, but segmented
 
-
-
-
-
+ggplot() +
+  geom_point(data = all_routes_seg_tunnel, aes(x, y, color = segment_id_cor), size = 0.01) +
+  geom_path(data = all_routes_seg_tunnel, aes(x, y, color = segment_id_cor)) +
+  labs(y="y", x="x") +
+  scale_x_continuous(limits = c(min(all_routes_seg_tunnel$x), max(all_routes_seg_tunnel$x))) +
+  scale_y_continuous(limits = c(1246000, max(all_routes_seg_tunnel$y))) +
+  guides(y = "axis_truncated",
+         x = "axis_truncated") +
+ # coord_fixed(clip = "off") +
+   theme_classic() +
+  theme(axis.title.y = element_text(size = 6, margin = margin(t = 0, r = 15, b = 0, l = 0)),
+        axis.title.x = element_text(size = 6, margin = margin(t = 10, r = 0, b = 0, l = 0)),
+        axis.line = element_line(size=0.3),
+        axis.text.x = element_text(size = 6, margin = margin(t = 7.5, r = 0, b = 0, l = 0)),
+        axis.text.y = element_text(size = 6, margin = margin(t = 0, r = 7.5, b = 0, l = 0)),
+        legend.position = "none") 
 
 
 
@@ -371,9 +656,8 @@ ggplot() +
 
 
 ggplot() +
-  geom_sf(data = gebaeude) +
-  scale_fill_manual("darkgrey") +
-  theme_void()
+  geom_sf(data = gebaeude, fill = "black", color = "white") +
+   theme_void()
 
 
 raeubertochter_map <- leaflet(all_routes) |> 
@@ -387,4 +671,10 @@ raeubertochter_map
 
 ```
 
+# Challenges
 
+1. Loosing all information using spatial tools like st_cast, interpolating etc... we loose our information stored in different columns and only get back a point geometry...
+
+2. Comparing time differences between pairs of last/first segment points in tunnel buffer...
+
+3. Map matching only on roads that we care about
