@@ -35,6 +35,7 @@ p_install("ggh4x", force = TRUE)
 p_install("forcats", force = TRUE)
 p_install("purr", force = TRUE)
 p_install("viridis", force = TRUE)
+p_install("osrm", force = TRUE)
 
 library("ggh4x")
 library("dplyr")
@@ -56,7 +57,8 @@ library("lubridate")
 library("shiny")
 library("forcats")
 library("purr")
-library("viridis") 
+library("viridis")
+library("osrm")
 
 ```
 
@@ -280,7 +282,7 @@ buffer_exit <- st_buffer(tunnel_exit, dist = 50)
 
 
 # Identify segments within the buffer
-first_last_points <- first_last_points |> 
+first_last_points_within <- first_last_points |> 
   mutate(
     intersect_start = sapply(st_intersects(geometry, buffer_entry, sparse = FALSE), any),
     intersect_end = sapply(st_intersects(geometry, buffer_exit, sparse = FALSE), any)
@@ -288,12 +290,12 @@ first_last_points <- first_last_points |>
   filter(intersect_start | intersect_end)
 
 # Calculate time difference between end of one segment and start of the next
-first_last_points <- first_last_points |> 
+first_last_points_within <- first_last_points_within |> 
   arrange(segment_id, time) |> 
   mutate(time_diff = time - lag(time))
 
 # Match segments where time difference is less than 2 minutes
-matched_segments <- first_last_points |> 
+matched_segments <- first_last_points_within |> 
   filter(time_diff <= 120 | is.na(time_diff) ) |> 
   mutate(new_segment_id = lag(segment_id)) |> 
   select(x,y,geometry,time_diff, segment_id, new_segment_id)
@@ -312,16 +314,16 @@ all_routes_seg_tunnel$segment_id_new <- ifelse(all_routes_seg_tunnel$segment_id 
                                     all_routes_seg_tunnel$segment_id)
 
 
-all_routes_seg_tunnel <- all_routes_seg_tunnel |> 
+all_routes_seg_tunnel_cor <- all_routes_seg_tunnel |> 
   group_by(segment_id_new, messenger) |> 
   mutate(segment_id_cor = as_factor(cur_group_id())) |> 
   select(-segment_id, -segment_id_new) |> 
   ungroup()
 
 
-raeubertochter_cor <- filter(all_routes_seg_tunnel, messenger == "raeubertochter")
+raeubertochter_cor <- filter(all_routes_seg_tunnel_cor, messenger == "raeubertochter")
 
-donner_cor <- filter(all_routes_seg_tunnel, messenger == "donner")
+donner_cor <- filter(all_routes_seg_tunnel_cor, messenger == "donner")
 
 
 ggplot(donner_cor,aes(x, y, color = segment_id_cor)) +
@@ -379,8 +381,7 @@ streets <- read_sf("gis_files/basic_data.gpkg", "street_network") |>
     width = as.numeric(substr(objektart, start = 1, stop = 1)),
     width_scaled = as.numeric(substr(objektart, start = 1, stop = 1)) *1000
   ) |> 
-  na.omit() |> 
-  filter(width > 1)
+  na.omit()
   
 
 
@@ -411,12 +412,13 @@ summary(surface$art)
 library(sf)
 library(tmap)
 
+################################### Nils #######################################################
 
 # since we want to find the closest location on the road over ALL roads
 # we need to create a union of the roads first.
 street_network <- st_union(streets)
 
-
+?st_nearest_points
 
 # Let's assume 'gps_locations' are your existing points
 # gps_locations <- ...
@@ -442,230 +444,11 @@ tm_shape(street_network, bbox = extent) + tm_lines() +
   tm_shape(all_routes_seg_tunnel$geometry) + tm_dots(col = "red")
 
 
-?st_cast
 
 
-```
+########################################### OSRM ####################################################
 
-# Visualizations for the presentation
 
-```{r}
-
-
-# Define the coordinates of the polygon
-coords <- rbind(c(2681695, 1247822), c(2683188, 1247822), c(2683188, 1246616), c(2681695, 1246616), c(2681695, 1247822))
-
-# Create a polygon
-polygon <- st_polygon(list(coords))
-
-# Convert to spatial object
-extent <- st_sfc(polygon, crs = 2056)
-
-
-housing <- st_intersection(housing, extent)
-streets <- st_intersection(streets, extent)
-surface <- st_intersection(surface, extent)
-
-raeubertochter_raw <- st_intersection(raeubertochter_raw, extent)
-raeubertochter_seg <- raeubertochter_seg |> 
-  st_intersection(extent) |> 
-  mutate(
-    segment_id = as.numeric(segment_id),
-    segment_id = as.factor(segment_id)
-  )
-
-raeubertochter_cor <- raeubertochter_cor |> 
-  st_intersection(extent) |> 
-  mutate(
-    segment_id_cor = as.numeric(segment_id_cor),
-    segment_id_cor = as.factor(segment_id_cor)
-  )
-
-
-
-
-my_palette <- c("Acker, Wiese, Weide" = "white", "Bahngebiet" = "white", "befestigte Fläche"  = "white", "bestockte Fläche" = "white", "fliessendes Gewässer" = "white", "Flugplatz" = "white", "Gartenanlage" = "white", "Gebäude" = "white", "geschlossener Wald" = "white", "Hoch-, Flachmoor" = "white", "humusierte Fläche" = "white", "Intensivkultur" = "white", "Reben" = "white", "Schilfgürtel" = "white", "stehendes Gewässer" = "white", "Strasse, Weg" = "white", "Trottoir" = "white", "Verkehrsinsel" = "white", "Wasserbecken" = "white") 
-                
-
-tm1 <- tm_shape(surface, bbox = extent) +
-  tm_polygons(border.col = NULL, col = "art", palette = my_palette, legend.show = F, ) +
-tm_shape(housing, bbox = extent) +
-  tm_polygons(col = "grey16", border.col = "white", lwd = 0.5) +
-tm_shape(streets, bbox = extent) +
-  tm_lines(lwd = "width", scale = 2.5, legend.lwd.show = FALSE) +
-tm_layout(frame = FALSE) +
-  tm_basemap(server = NULL)
-
-tmap_save(tm1, "overview.png", width = 250, height = 200, dpi = 1000, units = "mm")
-
-
-
-subset_data <- raeubertochter_raw[seq(1, nrow(raeubertochter_raw), by = 2), ]
-
-tm3 <- tm_shape(streets, bbox = extent) +
-  tm_lines(lwd = "width", scale = 2.5, legend.lwd.show = FALSE) +
-  tm_shape(housing, bbox = extent) +
-  tm_polygons(col = "grey16", border.col = "white", lwd = 0.5) +
-tm_shape(subset_data, bbox = extent) +
-  tm_symbols(size = 0.3, col = "red", palette = "Set3", alpha = 0.75, border.col = "NA") +
-  tm_layout(frame = FALSE) 
-
-tmap_save(tm3, "raeubertochter_raw.png", width = 250, height = 200, dpi = 1000, units = "mm")
-
-
-
-subset_data2 <- raeubertochter_seg[seq(1, nrow(raeubertochter_seg), by = 2), ]
-
-tm4 <- tm_shape(streets, bbox = extent) +
-  tm_lines(lwd = "width", scale = 2.5, legend.lwd.show = FALSE) +
-  tm_shape(housing, bbox = extent) +
-  tm_polygons(col = "grey16", border.col = "white", lwd = 0.5) +
-tm_shape(subset_data2, bbox = extent) +
-  tm_symbols(size = 0.25, col = "segment_id", alpha = 0.9, border.col = "NA", legend.col.show = F, palette = "Spectral") +
-  tm_layout(frame = FALSE) 
-
-tmap_save(tm4, "raeubertochter_seg.png", width = 250, height = 200, dpi = 1000, units = "mm")
-
-
-
-
-tm5 <- tm_shape(streets, bbox = extent) +
-  tm_lines(lwd = "width", scale = 2.5, legend.lwd.show = FALSE) +
-  tm_shape(housing, bbox = extent) +
-  tm_polygons(col = "grey16", border.col = "white", lwd = 0.5) +
-tm_shape(buffer_entry) +
-tm_polygons(col = "red", border.col = "red", lwd = 0.5, alpha = 0.5) +
-tm_shape(buffer_exit) +
- tm_polygons(col = "red", border.col = "red", lwd = 0.5, alpha = 0.5)+
-  tm_layout(frame = FALSE) +
- tm_shape(first_last_points, bbox = extent) +
-  tm_symbols(size = 0.75, col = "gold", alpha = 1, border.col = "gold", legend.col.show = F) 
-#tm_shape(subset_data2, bbox = extent) +
-# tm_symbols(size = 0.25, col = "segment_id", alpha = 0.75, border.col = "NA", legend.col.show = F) 
-  
-tmap_save(tm5, "overlay.png", width = 250, height = 200, dpi = 1000, units = "mm")
-
-
-
-subset_data3 <- raeubertochter_cor[seq(1, nrow(raeubertochter_cor), by = 2), ]
-
-tm6 <- tm_shape(streets, bbox = extent) +
-  tm_lines(lwd = "width", scale = 2.5, legend.lwd.show = FALSE) +
-    tm_shape(housing, bbox = extent) +
-  tm_polygons(col = "grey16", border.col = "white", lwd = 0.5) +
-tm_shape(subset_data3, bbox = extent) +
-  tm_symbols(size = 0.25, col = "segment_id_cor", alpha = 0.9, border.col = "NA", legend.col.show = F, palette = "Spectral") +
-  tm_layout(frame = FALSE) 
-
-tmap_save(tm6, "merged.png", width = 250, height = 200, dpi = 1000, units = "mm")
-
-
-
-
-ggplot() +
-  geom_sf(data = streets, lwd = streets$width/50, color = "lightgrey", fill = NA) +
-  scale_linetype_identity() +
-  geom_sf(data = all_routes_seg_tunnel, color = "yellow", size = 0.001) +
-  theme_void() +
-  theme(
-    plot.background = element_rect(fill = "black"),
-    panel.background = element_rect(fill = "black")
-  )
-
-
-png(file="day1.png", width = 125, height= 116.75, units= "mm", res=1000)
-p1
-dev.off() 
-
-
-
-# visualize two shifts
-
-
-ggplot() +
-  geom_point(data = raeubertochter_raw, aes(x, y), size = 0.01) +
-  #geom_path(data = raeubertochter, aes(x, y)) +
-  labs(y="y", x="x") +
-  scale_y_continuous(limits = c(1246000, 1250000)) +
-  scale_x_continuous(limits = c(min(raeubertochter_raw$x), max(raeubertochter_raw$x))) +
-  guides(y = "axis_truncated",
-         x = "axis_truncated") +
- coord_fixed(clip = "off") +
-   theme_classic() +
-  theme(axis.title.y = element_text(size = 6, margin = margin(t = 0, r = 15, b = 0, l = 0)),
-        axis.title.x = element_text(size = 6, margin = margin(t = 10, r = 0, b = 0, l = 0)),
-        axis.line = element_line(size=0.3),
-        axis.text.x = element_text(size = 6, margin = margin(t = 7.5, r = 0, b = 0, l = 0)),
-        axis.text.y = element_text(size = 6, margin = margin(t = 0, r = 7.5, b = 0, l = 0))) 
-
-
-ggplot() +
-  geom_point(data = raeubertochter_cor, aes(x, y, color = segment_id_cor), size = 0.01) +
-  #geom_path(data = raeubertochter, aes(x, y)) +
-  labs(y="y", x="x") +
-  scale_y_continuous(limits = c(1246000, 1250000)) +
-  scale_x_continuous(limits = c(min(raeubertochter_cor$x), max(raeubertochter_cor$x))) +
-  guides(y = "axis_truncated",
-         x = "axis_truncated") +
- coord_fixed(clip = "off") +
-   theme_classic() +
-  theme(axis.title.y = element_text(size = 6, margin = margin(t = 0, r = 15, b = 0, l = 0)),
-        axis.title.x = element_text(size = 6, margin = margin(t = 10, r = 0, b = 0, l = 0)),
-        axis.line = element_line(size=0.3),
-        axis.text.x = element_text(size = 6, margin = margin(t = 7.5, r = 0, b = 0, l = 0)),
-        axis.text.y = element_text(size = 6, margin = margin(t = 0, r = 7.5, b = 0, l = 0)),
-        legend.position = "none") 
-
-
-
-
-png(file="shifts.png", width = 200, height= 175, units= "mm", res=1000)
-p2
-dev.off() 
-
-# visualize two shifts, but segmented
-
-ggplot() +
-  geom_point(data = all_routes_seg_tunnel, aes(x, y, color = segment_id_cor), size = 0.01) +
-  geom_path(data = all_routes_seg_tunnel, aes(x, y, color = segment_id_cor)) +
-  labs(y="y", x="x") +
-  scale_x_continuous(limits = c(min(all_routes_seg_tunnel$x), max(all_routes_seg_tunnel$x))) +
-  scale_y_continuous(limits = c(1246000, max(all_routes_seg_tunnel$y))) +
-  guides(y = "axis_truncated",
-         x = "axis_truncated") +
- # coord_fixed(clip = "off") +
-   theme_classic() +
-  theme(axis.title.y = element_text(size = 6, margin = margin(t = 0, r = 15, b = 0, l = 0)),
-        axis.title.x = element_text(size = 6, margin = margin(t = 10, r = 0, b = 0, l = 0)),
-        axis.line = element_line(size=0.3),
-        axis.text.x = element_text(size = 6, margin = margin(t = 7.5, r = 0, b = 0, l = 0)),
-        axis.text.y = element_text(size = 6, margin = margin(t = 0, r = 7.5, b = 0, l = 0)),
-        legend.position = "none") 
-
-
-
-
-
-
-ggplot() +
-  geom_sf(data = strassen, lwd = strassen$width/50) +
-  scale_linetype_identity() +
-  geom_sf(data = gebaeude, alpha = 0.5) +
-  scale_fill_manual("black") +
-  theme_void()
-
-
-ggplot() +
-  geom_sf(data = gebaeude, fill = "black", color = "white") +
-   theme_void()
-
-
-raeubertochter_map <- leaflet(all_routes) |> 
-  addTiles() |> 
-  addCircleMarkers(lng = ~x,
-                   lat = ~y)
-
-raeubertochter_map
 
 
 
