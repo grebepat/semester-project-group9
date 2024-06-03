@@ -38,6 +38,7 @@ p_install("viridis", force = TRUE)
 p_install("osrm", force = TRUE)
 p_install("httr", force = TRUE)
 p_install("mapmatchr", force = TRUE)
+p_install("hereR", force = TRUE)
 
 library("ggh4x")
 library("dplyr")
@@ -63,6 +64,7 @@ library("viridis")
 library("osrm")
 library("httr")
 library("mapmatchr")
+library("here")
 
 ```
 
@@ -515,10 +517,10 @@ p_install("mapamtchr", force = TRUE)
 taj <- all_routes_seg_tunnel_cor |> 
   select(id, messenger, shift, time, geometry, duration, segment_id_cor)
 
-tm_shape(all_routes_seg_tunnel_cor) +
-  tm_dots()  +
-  tm_shape(streets) +
-  tm_lines()
+#tm_shape(all_routes_seg_tunnel_cor) +
+ # tm_dots()  +
+  #tm_shape(streets) +
+  #tm_lines()
 
 taj2 <- st_buffer(taj, 0.25)
 
@@ -617,6 +619,61 @@ taj_mahal |>
   scale_fill_brewer(palette = "Set1")  # Use a color palette that suits your data
 
 ```
+
+# Alternative trajectories
+
+```{r}
+
+a_to_b <- taj_mahal |> 
+  group_by(segment_id_cor) |> 
+  slice(c(1, n())) |> 
+  ungroup()
+
+tmap_mode("plot")
+tm_shape(a_to_b) + 
+  tm_dots() 
+
+library("hereR")
+set_key("PARpVmlSSQAeuGjMhIdg94LMi9s1ha4UShazq0j8sAo")
+
+
+# Create a dataframe with even rows
+df_even <- a_to_b[seq(2, nrow(a_to_b), by = 2), ]
+df_even <- df_even[2, ]
+
+
+# Create a dataframe with odd rows
+df_odd <- a_to_b[seq(1, nrow(a_to_b), by = 2), ]
+df_odd <- df_odd[2,]
+
+
+
+alternative <- route(origin = df_odd, destination = df_even, transport_mode = "bicycle", traffic = FALSE, results = 4)
+
+plot(alternative)
+
+alternative_matrix <- route_matrix(df_odd, df_even, traffic = FALSE, transport_mode = "bicycle")
+
+donner_vis <- donner_cor |> 
+  filter(segment_id_cor == 2)
+
+?route
+
+tmap_mode("plot")
+tm_shape(streets, bbox = donner_vis) +
+  tm_lines(lwd = "width", scale = 1.5, legend.lwd.show = FALSE) +
+tm_shape(alternative) +
+  tm_lines(col = "rank", lwd = 2) +
+tm_shape(df_even) +
+  tm_dots(col = "lightblue", size = 2) +
+tm_shape(df_odd) +
+  tm_dots(col = "gold", size = 2) +
+tm_shape(donner_vis) +
+  tm_dots(col = "purple", size = .15) 
+
+```
+
+
 
 # Challenges
 
