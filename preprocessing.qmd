@@ -36,6 +36,8 @@ p_install("forcats", force = TRUE)
 p_install("purr", force = TRUE)
 p_install("viridis", force = TRUE)
 p_install("osrm", force = TRUE)
+p_install("httr", force = TRUE)
+p_install("mapmatchr", force = TRUE)
 
 library("ggh4x")
 library("dplyr")
@@ -59,6 +61,8 @@ library("forcats")
 library("purr")
 library("viridis")
 library("osrm")
+library("httr")
+library("mapmatchr")
 
 ```
 
@@ -401,6 +405,9 @@ surface <- read_sf("gis_files/basic_data.gpkg", "surface_type") |>
 
 summary(surface$art)
 
+
+height <- terra::rast("gis_files/dhm25_zh.tif")
+
 ```
 
 
@@ -414,6 +421,16 @@ library(tmap)
 
 ################################### Nils #######################################################
 
+# Define the coordinates of the polygon
+coords <- rbind(c(2681695, 1247822), c(2683188, 1247822), c(2683188, 1246616), c(2681695, 1246616), c(2681695, 1247822))
+
+# Create a polygon
+polygon <- st_polygon(list(coords))
+
+# Convert to spatial object
+extent <- st_sfc(polygon, crs = 2056)
+
+
 # since we want to find the closest location on the road over ALL roads
 # we need to create a union of the roads first.
 street_network <- st_union(streets)
@@ -424,7 +441,7 @@ street_network <- st_union(streets)
 # gps_locations <- ...
 
 # Now we can get the nearest point for each GPS location
-nearest <- st_nearest_points(all_routes_seg_tunnel, street_network)
+nearest <- st_nearest_points(all_routes_seg_tunnel_cor, street_network)
 
 # The output is a line for each point
 # Now we need convert the output from LINE to POINT. 
@@ -435,22 +452,169 @@ near_p <- st_cast(nearest, "POINT")
 near_to <- near_p[c(FALSE,TRUE)]
 
 # Update the geometry of the original points with the new locations
-st_geometry(all_routes_seg_tunnel) <- st_geometry(near_to)
+st_geometry(all_routes_seg_tunnel_cor) <- st_geometry(near_to)
 
 tmap_mode("view")
-tm_shape(street_network, bbox = extent) + tm_lines() +
-  tm_shape(nearest) + tm_lines(lty = 3) +
- 
-  tm_shape(all_routes_seg_tunnel$geometry) + tm_dots(col = "red")
+tm_shape(street_network, bbox = extent) + 
+  tm_lines() +
+tm_shape(nearest) + 
+  tm_lines(lty = 3) +
+tm_shape(all_routes_seg_tunnel_cor$geometry) + 
+  tm_dots(col = "red")
 
 
 
 
-########################################### OSRM ####################################################
+########################################### Valhalla ####################################################
+
+system("docker pull valhalla/valhalla")
+
+?jsonlite
+
+
+map_matching <- function(df) {
+  meili_coordinates <- jsonify::to_json(df)
+  meili_head <- '{\"shape\":'
+  meili_tail <- ",\"search_radius\": 50, \"shape_match\":\"map_snap\", \"costing\":\"auto\", \"format\":\"osrm\"}"
+  meili_request_body <- paste(meili_head, meili_coordinates, meili_tail, sep = "")
+  url <- "http://localhost:8002/trace_route"
+  headers <- list('Content-type' = 'application/json')
+  data <- str(meili_request_body)
+  r <- httr::POST(url, body = data, headers = headers)
+  if (r$status_code == 200) {
+    response_text <- jsonlite::fromJSON(content(r, "text"), simplifyVector = FALSE)
+    resp <- str(response_text$tracepoints)
+    resp <- gsub("None", "{'matchings_index': '#', 'name': '', 'waypoint_index': '#', 'alternatives_count': 0, 'distance': 0, 'location': [0.0, 0.0]}", resp)
+    resp <- gsub("'", "\"", resp)
+    matched_df <- df.copy()
+    df_response <- jsonlite::fromJSON(resp)
+    for (i in seq_along(df_response)) {
+      if (matched_df$lon[i] != 0.0) {
+        matched_df$lon[i] <- df_response$location[[i]][1]
+        matched_df$lat[i] <- df_response$location[[i]][2]
+      }
+    }
+    return(matched_df)
+  }
+}
+
+map_matching(all_routes_seg_tunnel_cor)
+
+
+
+#################################### MAPMATCHR #######################################################
+
+p_install("mapamtchr", force = TRUE)
+
+```
+
+# Enrich street network
+
+```{r}
+
+taj <- all_routes_seg_tunnel_cor |> 
+  select(id, messenger, shift, time, geometry, duration, segment_id_cor)
+
+tm_shape(all_routes_seg_tunnel_cor) +
+  tm_dots()  +
+  tm_shape(streets) +
+  tm_lines()
+
+taj2 <- st_buffer(taj, 0.25)
+
+taj_width <- st_join(taj2, streets, left = TRUE, suffix = "street", join = st_intersects)
+
+
+taj_count <- taj_width |> 
+  st_drop_geometry() |> 
+  group_by(messenger, segment_id_cor, width) |> 
+  summarise(count = n()) |> 
+  mutate(total = sum(count), 
+         percentage = count / total * 100) |> 
+ungroup()
+
+
+head(taj_width)
+
+taj_width <-  st_centroid(taj_width, crs = 2056)
+
+
+
+plot(height)
+
+extracted_height <- extract(height, taj_width)
+
+taj_width$height <- round(extracted_height$dhm25_zh,2)
+
+slope <- terrain(height, v = "slope", unit = "degrees", neighbors = 8)
+extracted_slope <- extract(slope, taj_width)
+taj_width$slope <- round(extracted_slope$slope,2)
+
+taj_enriched <- taj_width |> 
+  select(-width_scaled, -objektart)
 
 
 
 
+
+taj_mahal <- taj_enriched %>%
+  st_transform(crs = 2056) |> 
+  arrange(segment_id_cor) %>%
+  group_by(segment_id_cor) %>%
+  mutate(height_diff = c(0, diff(height)),
+         cumulative_up = cumsum(ifelse(height_diff > 0, height_diff, 0)),
+         tot_up = sum(ifelse(height_diff > 0, height_diff, 0)),
+         cumulative_down = cumsum(ifelse(height_diff < 0, height_diff, 0)),
+         tot_down = sum(ifelse(height_diff < 0, height_diff, 0)),
+         lead_geom = lead(geometry),
+         travel_dist = sqrt(round(ifelse(!is.na(lead_geom), st_distance(lead_geom, geometry, by_element = TRUE), 0), 1))^2,
+         slope_calc = atan(height_diff / travel_dist), 
+         slope_up = cumsum(ifelse(slope_calc > 0, slope_calc, 0)),
+         slope_tot_up = sum(ifelse(slope_calc > 0, slope_calc, 0)),
+         slope_down = cumsum(ifelse(slope_calc < 0, slope_calc, 0)),
+         slope_tot_down = sum(ifelse(slope_calc < 0, slope_calc, 0)),
+         
+         
+         
+         ) %>%
+  ungroup()
+
+
+
+
+
+subset_taj <- taj_enriched %>%
+  filter(segment_id_cor %in% sample(unique(segment_id_cor), 5)) # Adjust the number of segments as needed
+
+# Apply the same operations but print out the intermediate results
+subset_taj <- subset_taj %>%
+  st_transform(crs = 2056) %>%
+  arrange(segment_id_cor) %>%
+  group_by(segment_id_cor) %>%
+  mutate(
+    lag_geom = lag(geometry),
+    travel_dist = st_distance(lag_geom, geometry)
+  ) 
+
+# Print out the results
+head(subset_taj)
+
+
+
+
+euclid <- function(x1, x2, y1, y2){
+  distance <- sqrt((x2 - x1)^2 + (y2 - y1)^2)
+  return(distance)
+}
+
+
+
+
+taj_mahal |> 
+  filter(segment_id_cor == 1 | segment_id_cor == 2) |> 
+ ggplot( aes(x = time, y = travel_dist, color = segment_id_cor)) +
+  geom_line() +
+  scale_fill_brewer(palette = "Set1")  # Use a color palette that suits your data
 
 ```
 
@@ -461,3 +625,5 @@ tm_shape(street_network, bbox = extent) + tm_lines() +
 2. Comparing time differences between pairs of last/first segment points in tunnel buffer...
 
 3. Map matching only on roads that we care about
+
+4. Do we work with points, line segments, nodes? How do we summarize for example slope on a given road? 
