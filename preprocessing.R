@@ -24,7 +24,7 @@ library("lubridate")
 #Task 1: Import your data
 
 # generate a list of all filenames including the path from the subfolder they are stored in
-file_list <- list.files("Strava Data Chahan/activities/", recursive = TRUE, pattern = "\\.gpx$", full.names = TRUE)
+file_list <- list.files("gps_files_shared/Strava Data Chahan/", recursive = TRUE, pattern = "\\.gpx$", full.names = TRUE)
 
 
 # Get Path of the subfolders to extraxt names of subfolders and / or filenames
@@ -77,13 +77,17 @@ for (file in file_list) {
   all_routes <- rbind(all_routes, df_sf)
 }
 
+------------------------------------------------------------------------------
+
 # bind all_routes with activity name
-names <- read_delim("Strava Data Chahan/activities.csv") %>% 
+names <- read_delim("gps_files_shared/Strava Data Chahan/activities.csv") %>% 
   select(`AktivitÃ¤ts-ID`, `Name der AktivitÃ¤t`, `AktivitÃ¤tsart`, Dateiname) %>% 
   rename("id" = `AktivitÃ¤ts-ID`, "Name" = `Name der AktivitÃ¤t`, "Aktivität" = `AktivitÃ¤tsart`)
 
 names <- names %>% 
   filter(Aktivität == "Radfahrt" & grepl("\\.gpx$", Dateiname))
+
+names
 
 # change id in all_routes to numeric
 all_routes$id <- as.numeric(all_routes$id)

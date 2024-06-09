@@ -1,0 +1,24 @@
+---
+title: "Notes"
+format: html
+editor: visual
+---
+
+# Open Questions
+
+With which enteties do we work? Do we work with points or lines? (if could split segment in street segments, this would make it quite straight forward.
+
+How do we handle slope?
+We have slope at every point from the digitales höhenmodell
+We have altitude at every point from the digitales höhenmodell
+We have calculated distance, slope and altitude differences between points
+GPS-fixes, edges, nodes
+
+We have these values summed per segment and cummulative between points
+
+# challenges
+
+Map matching does not work.
+We need a better street map.
+We need alternative segments from HERE
+
