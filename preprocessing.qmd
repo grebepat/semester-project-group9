@@ -18,6 +18,7 @@ p_install("ggplot2", force = FALSE)
 p_install("readr", force = FALSE)
 p_install("tidyr", force = FALSE)
 p_install("sf", force = FALSE)
+p_install("sp", force = FALSE)
 p_install("terra", force = FALSE)
 p_install("tmap", force = FALSE)
 p_install("zoo", force = FALSE)
@@ -65,6 +66,7 @@ library("osrm")
 library("httr")
 library("mapmatchr")
 library("here")
+library("sp")
 
 ```
 
@@ -456,13 +458,18 @@ near_to <- near_p[c(FALSE,TRUE)]
 # Update the geometry of the original points with the new locations
 st_geometry(all_routes_seg_tunnel_cor) <- st_geometry(near_to)
 
-tmap_mode("view")
+tmap_mode("plot")
+
+
 tm_shape(street_network, bbox = extent) + 
   tm_lines() +
 tm_shape(nearest) + 
   tm_lines(lty = 3) +
 tm_shape(all_routes_seg_tunnel_cor$geometry) + 
-  tm_dots(col = "red")
+  tm_dots(col = "purple") + 
+tm_shape(near_to) + 
+  tm_dots(col = "lightblue")
+
 
 
 
@@ -639,28 +646,43 @@ set_key("PARpVmlSSQAeuGjMhIdg94LMi9s1ha4UShazq0j8sAo")
 
 # Create a dataframe with even rows
 df_even <- a_to_b[seq(2, nrow(a_to_b), by = 2), ]
-df_even <- df_even[2, ]
+df_even <- df_even[1, ]
 
 
 # Create a dataframe with odd rows
 df_odd <- a_to_b[seq(1, nrow(a_to_b), by = 2), ]
-df_odd <- df_odd[2,]
+df_odd <- df_odd[1,]
 
 
 
-alternative <- route(origin = df_odd, destination = df_even, transport_mode = "bicycle", traffic = FALSE, results = 4)
+alternative <- route(origin = df_odd, destination = df_even, transport_mode = "bicycle", traffic = FALSE, results = 5, routing_mode = "short")
 
 plot(alternative)
 
-alternative_matrix <- route_matrix(df_odd, df_even, traffic = FALSE, transport_mode = "bicycle")
 
 donner_vis <- donner_cor |> 
-  filter(segment_id_cor == 2)
+  filter(segment_id_cor == 1)
 
-?route
+
+
+extent2 <- st_transform(st_buffer(alternative, 200), crs = 2056)
+st_bbox(extent2)
+
+coords <- rbind(c(2679514  , 1249013 ), c(2683075, 1249013 ), c(2683075, 1247635), c(2679514 , 1247635), c(2679514 , 1249013 ))
+
+# Create a polygon
+polygon <- st_polygon(list(coords))
+
+# Convert to spatial object
+extent2 <- st_sfc(polygon, crs = 2056)
+
+
+
+streets <- st_intersection(streets, extent2)
+housing <- st_intersection(housing, extent2)
 
 tmap_mode("plot")
-tm_shape(streets, bbox = donner_vis) +
+tm_shape(streets, bbox = extent2) +
   tm_lines(lwd = "width", scale = 1.5, legend.lwd.show = FALSE) +
 tm_shape(alternative) +
   tm_lines(col = "rank", lwd = 2) +
@@ -669,7 +691,58 @@ tm_shape(df_even) +
 tm_shape(df_odd) +
   tm_dots(col = "gold", size = 2) +
 tm_shape(donner_vis) +
-  tm_dots(col = "purple", size = .15) 
+  tm_dots(col = "purple", size = .15) +
+ tm_layout(frame = FALSE, bg.color = "transparent")
+
+
+tm1 <- tm_shape(surface, bbox = extent2) +
+  tm_polygons(border.col = NULL, col = "art", palette = my_palette, legend.show = F, ) +
+tm_shape(housing, bbox = extent) +
+  tm_polygons(col = "grey25", border.col = "white", lwd = 0.5, alpha = .9) +
+tm_shape(streets, bbox = extent) +
+  tm_lines(lwd = "width", scale = 2.5, legend.lwd.show = FALSE) +
+tm_layout(frame = FALSE) +
+  tm_basemap(server = NULL)
+
+
+tm10 <- tm_shape(streets, bbox = extent2) +
+  tm_lines(lwd = "width", scale = 2.5, legend.lwd.show = FALSE) +
+tm_shape(housing, bbox = extent2) +
+  tm_polygons(col = "grey25", border.col = "white", lwd = 0.5, alpha = .9) +
+  tm_layout(frame = FALSE)
+
+tmap_save(tm10, "presentation/overview_routing.png", width =300, height = 150, dpi = 1000, units = "mm")
+
+
+tm11 <- tm_shape(donner_vis, bbox = extent2) +
+  tm_symbols(size = 0.5, col = "red",  alpha = 0.6, border.col = "NA") +
+  tm_layout(frame = FALSE, bg.color = "transparent") 
+
+tmap_save(tm11, "presentation/donner_routing.png", width =300, height = 150, dpi = 1000, units = "mm", bg="transparent")
+
+
+tm12 <-  tm_shape(df_even,  bbox = extent2) +
+  tm_dots(col = "steelblue", size = 2.5, border.col = "NA", alpha = 0.9) +
+tm_shape(df_odd) +
+  tm_dots(col = "gold", size = 2.5, border.col = "NA", alpha = 0.9) +
+  tm_layout(frame = FALSE, bg.color = "transparent") 
+
+tmap_save(tm12, "presentation/start_end_routing.png", width =300, height = 150, dpi = 1000, units = "mm", bg="transparent")
+
+
+my_palette <- c("#11E2A1", "#9E1FA2")
+
+tm13 <-  tm_shape(df_even,  bbox = extent2) +
+  tm_dots(col = "steelblue", size = 2.5, border.col = "NA", alpha = 0.9) +
+tm_shape(df_odd) +
+  tm_dots(col = "gold", size = 2.5, border.col = "NA", alpha = 0.9) +
+tm_shape(alternative) +
+  tm_lines(col = "rank", lwd = 5, palette = my_palette, border.col = "NA", legend.col.show = F) +
+
+  tm_layout(frame = FALSE, bg.color = "transparent") 
+
+tmap_save(tm13, "presentation/alternative_routing.png", width =300, height = 150, dpi = 1000, units = "mm", bg="transparent")
+
 
 ```
 
