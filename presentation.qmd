@@ -324,6 +324,43 @@ raeubertochter_map
 
 
 
+# Define the coordinates of the polygon
+coords <- rbind(c(2682094, 1247370), c(2682094, 1247612), c(2682433, 1247612), c(2682433, 1247370), c(2682094, 1247370))
+
+# Create a polygon
+polygon <- st_polygon(list(coords))
+
+# Convert to spatial object
+extent4 <- st_sfc(polygon, crs = 2056)
+
+
+housing <- st_intersection(housing, extent4)
+streets <- st_intersection(streets, extent4)
+surface <- st_intersection(surface, extent4)
+
+
+
+
+
+tmap_mode("plot")
+
+
+tm_13 <- tm_shape(streets, bbox = extent4) + 
+   tm_lines(lwd = "width", scale = 2.5, legend.lwd.show = FALSE) +
+  tm_shape(housing, bbox = extent) +
+  tm_polygons(col = "grey25", border.col = "white", lwd = 0.5, alpha = 0.9) +
+tm_shape(nearest) + 
+  tm_lines(lwd = 1) +
+tm_shape(all_routes_seg_tunnel_cor$geometry) + 
+  tm_dots(col = "purple", border.col = "purple", size = 0.6, alpha = .9, ) + 
+tm_shape(near_to) + 
+  tm_dots(col = "lightblue", size = 0.6, alpha = .9, border.col = "lightblue",) +
+  tm_layout(frame = FALSE, bg.color = "transparent") 
+
+tmap_save(tm_13, "presentation/map_matching.png", width = 250, height = 200, dpi = 1000, units = "mm")
+
+
+
 ```
 
 

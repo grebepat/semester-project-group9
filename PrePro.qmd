@@ -4,44 +4,12 @@ format: html
 editor: visual
 ---
 
+
+
 # Install Packages
 
 ```{r}
-# install.packages("pacman")
-# library("pacman")
-# 
-# p_install("dplyr", force = FALSE)
-# p_install("ggplot2", force = FALSE)
-# p_install("readr", force = FALSE)
-# p_install("tidyr", force = FALSE)
-# p_install("sf", force = FALSE)
-# p_install("terra", force = FALSE)
-# p_install("tmap", force = FALSE)
-# p_install("zoo", force = FALSE)
-# p_install("units", force = FALSE)
-# p_install("plotly", force = FALSE)
-# p_install("patchwork", force = FALSE)
-# p_install("tidyverse", force = FALSE)
-# p_install("rjson", force = FALSE)
-# p_install("jsonlite", force = FALSE)
-# p_install("leaflet", force = TRUE)
-# p_install("shiny", force = TRUE)
-# p_install("XML", force = TRUE)
-# p_install("lubridate", force = TRUE)
-# p_install("ggh4x", force = TRUE)
-# p_install("forcats", force = TRUE)
-# p_install("purrr", force = TRUE)
-# p_install("viridis", force = TRUE)
-# p_install("osrm", force = TRUE)
-# p_install("httr", force = TRUE)
-# p_install("mapmatchr", force = TRUE)
-# p_install("hereR", force = TRUE)
-# p_install("sp", force = TRUE)
-```
 
-<<<<<<< HEAD
-# Load packages
-=======
 install.packages("pacman")
 library("pacman")
 
@@ -66,22 +34,18 @@ p_install("XML", force = TRUE)
 p_install("lubridate", force = TRUE)
 p_install("ggh4x", force = TRUE)
 p_install("forcats", force = TRUE)
-p_install("purrr", force = TRUE)
+p_install("purr", force = TRUE)
 p_install("viridis", force = TRUE)
 p_install("osrm", force = TRUE)
 p_install("httr", force = TRUE)
 p_install("mapmatchr", force = TRUE)
 p_install("hereR", force = TRUE)
-p_install("sp", force = TRUE)
->>>>>>> 5b1ca80874327107baf1a566403d915d7d95b228
 
-```{r}
 library("ggh4x")
 library("dplyr")
 library("ggplot2")
 library("tidyr")
 library("sf")
-library("sp")
 library("terra")
 library("tmap")
 library("zoo")
@@ -96,28 +60,24 @@ library("XML")
 library("lubridate")
 library("shiny")
 library("forcats")
-library("purrr")
+library("purr")
 library("viridis")
 library("osrm")
 library("httr")
 library("mapmatchr")
-<<<<<<< HEAD
 library("here")
 library("sp")
-=======
-library("hereR")
-<<<<<<< HEAD
-=======
->>>>>>> f08770080dcba2ba396927d0228eb68552f0b88e
 
->>>>>>> 5b1ca80874327107baf1a566403d915d7d95b228
 ```
+
 
 # Task 1: Import Express: Bringing GPS Data Onboard
 
-Folgend werden alle .gpx-Files aus dem Ordner *GPS_Daten* eingelesen. Aus den .gpx-Files werden die Koordinaten herausgelesen und jede gefahrene Route / Aktivität in einem neuen Dataframe abgespeichert. Die Dataframes landen alle in einer Liste `single_routes` und können über diese abgerufen und dargestellt werden. In einer weiteren Variante werden alle Daten in einen einzigen Data Frame verpackt `all_routes`.
+Folgend werden alle .gpx-Files aus dem Ordner *GPS_Daten* eingelesen. Aus den .gpx-Files werden die Koordinaten herausgelesen und jede gefahrene Route / Aktivität in einem neuen Dataframe abgespeichert. Die Dataframes landen alle in einer Liste `single_routes` und können über diese abgerufen und dargestellt werden.In einer weiteren Variate werden alle Daten in einen einzigen Data Frame verpackt `all_routes`.
 
 ```{r}
+
+
 # generate a list of all filenames including the path from the subfolder they are stored in
 file <- list.files("gps_files_shared", recursive = TRUE, pattern = "\\.gpx$", full.names = TRUE)
 
@@ -156,35 +116,14 @@ all_routes <- do.call(rbind, single_routes)
 raeubertochter_raw <- filter(all_routes, messenger == "raeubertochter")
 donner_raw <- filter(all_routes, messenger == "donner")
 
-# filter only messenger rides. We do this by filtering the routes that have taken place in the city of zurich
 
-# Define simple bounding box for Zurich
-zurich <- st_bbox(c(xmin = 8.387726, ymin = 47.301000, xmax = 8.658916, ymax = 47.462420), crs = st_crs(4326))
-
-# Convert the bounding box to a polygon
-zurich <- st_as_sfc(zurich)
-
-# Transform the CRS of zurich to match that of donner_raw
-zurich <- st_transform(zurich, st_crs(donner_raw))
-
-tm_shape(zurich) +
-  tm_polygons()
-
-# Filter the points within the Zurich bounding box
-donner_filtered <- donner_raw[st_intersects(donner_raw, zurich, sparse = FALSE), ]
-
-tmap_mode("view")
-
-tm_shape(donner_filtered) +
-  tm_dots()
-
-all_routes2 <- donner_filtered %>% 
-  bind_rows(raeubertochter_raw)
 
 # Quick overview
 tmap_mode("plot")
 tm_shape(single_routes[[2]]) +
-  tm_dots(col = "messenger", palette = "seq", border.col = NULL)
+  tm_dots( col = "messenger", palette = "seq", border.col = NULL)
+
+
 ```
 
 # Task 2: Signal Sync: Assessing Sampling Intervals Across Messenger GPS Systems
@@ -225,7 +164,7 @@ ggplot(all_routes, aes(x = time_difference)) +
 
 # Both with similar but slightly different sampling regimes, raeubertochter with an intervall of 1 second- It seems that static time is already removed..
 
-# Donner with more variation between fixes, but still short intervals, might need another segmentation...
+# Donner with more variation between fixes, but still short intervalls, might need another segmentation...
 
 ```
 
@@ -234,7 +173,7 @@ ggplot(all_routes, aes(x = time_difference)) +
 ```{r}
 
 
-# First we try the same segmentation method for all messengers
+# First we try the same segmentation method for all messenegrs
 
 # create a moving time window
 all_routes_seg <- all_routes |> 
@@ -258,7 +197,9 @@ all_routes_seg <- all_routes_seg |> # calculate rowwise mean distance per messen
 
 # create a new column static, based on time_difference (over 20s time difference)
 all_routes_seg <- all_routes_seg |> 
-  mutate(new_segment = timeMean > 20)
+  mutate(
+    new_segment = timeMean > 20
+  )
 
 # it assigns unique IDs based on the column static
 rle_id <- function(vec) {
@@ -473,6 +414,8 @@ height <- terra::rast("gis_files/dhm25_zh.tif")
 
 ```
 
+
+
 ## Map Matching
 
 ```{r}
@@ -684,9 +627,10 @@ taj_mahal |>
 
 ```
 
-# Alternative trajectories with hereR:route()
+# Alternative trajectories
 
 ```{r}
+
 a_to_b <- taj_mahal |> 
   group_by(segment_id_cor) |> 
   slice(c(1, n())) |> 
@@ -696,7 +640,7 @@ tmap_mode("plot")
 tm_shape(a_to_b) + 
   tm_dots() 
 
-# load the generated APPkey from the website
+library("hereR")
 set_key("PARpVmlSSQAeuGjMhIdg94LMi9s1ha4UShazq0j8sAo")
 
 
@@ -800,31 +744,16 @@ tm_shape(alternative) +
 tmap_save(tm13, "presentation/alternative_routing.png", width =300, height = 150, dpi = 1000, units = "mm", bg="transparent")
 
 
-
-# map matching with hereR
-
-??hereR
-
-tmap_mode("plot")
-tm_shape(streets, bbox = donner_vis) +
-  tm_lines(lwd = "width", scale = 1.5, legend.lwd.show = FALSE) +
-tm_shape(alternative) +
-  tm_lines(col = "rank", lwd = 2) +
-tm_shape(df_even) +
-  tm_dots(col = "lightblue", size = 2) +
-tm_shape(df_odd) +
-  tm_dots(col = "gold", size = 2) +
-tm_shape(donner_vis) +
-  tm_dots(col = "purple", size = .15) 
-
 ```
+
+
 
 # Challenges
 
-1.  Loosing all information using spatial tools like st_cast, interpolating etc... we loose our information stored in different columns and only get back a point geometry...
+1. Loosing all information using spatial tools like st_cast, interpolating etc... we loose our information stored in different columns and only get back a point geometry...
 
-2.  Comparing time differences between pairs of last/first segment points in tunnel buffer...
+2. Comparing time differences between pairs of last/first segment points in tunnel buffer...
 
-3.  Map matching only on roads that we care about
+3. Map matching only on roads that we care about
 
-4.  Do we work with points, line segments, nodes? How do we summarize for example slope on a given road?
+4. Do we work with points, line segments, nodes? How do we summarize for example slope on a given road? 
