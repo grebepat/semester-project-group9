@@ -573,14 +573,14 @@ taj_mahal <- taj_enriched %>%
   mutate(height_diff = c(0, diff(height)),
          cumulative_up = cumsum(ifelse(height_diff > 0, height_diff, 0)),
          tot_up = sum(ifelse(height_diff > 0, height_diff, 0)),
-         cumulative_down = cumsum(ifelse(height_diff < 0, height_diff, 0)),
+         cumulative_down = cumsum(ifelse(height_diff < 0, height_diff, 0)),data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABIAAAASCAYAAABWzo5XAAAAbElEQVR4Xs2RQQrAMAgEfZgf7W9LAguybljJpR3wEse5JOL3ZObDb4x1loDhHbBOFU6i2Ddnw2KNiXcdAXygJlwE8OFVBHDgKrLgSInN4WMe9iXiqIVsTMjH7z/GhNTEibOxQswcYIWYOR/zAjBJfiXh3jZ6AAAAAElFTkSuQmCC
          tot_down = sum(ifelse(height_diff < 0, height_diff, 0)),
          lead_geom = lead(geometry),
          travel_dist = sqrt(round(ifelse(!is.na(lead_geom), st_distance(lead_geom, geometry, by_element = TRUE), 0), 1))^2,
          slope_calc = atan(height_diff / travel_dist), 
-         slope_up = cumsum(ifelse(slope_calc > 0, slope_calc, 0)),
+         cum_slope_up = cumsum(ifelse(slope_calc > 0, slope_calc, 0)),
          slope_tot_up = sum(ifelse(slope_calc > 0, slope_calc, 0)),
-         slope_down = cumsum(ifelse(slope_calc < 0, slope_calc, 0)),
+         cum_slope_down = cumsum(ifelse(slope_calc < 0, slope_calc, 0)),
          slope_tot_down = sum(ifelse(slope_calc < 0, slope_calc, 0)),
          
          
