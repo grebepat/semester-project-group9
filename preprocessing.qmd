@@ -8,7 +8,7 @@ editor: visual
 
 ```{r}
 # install.packages("pacman")
-# library("pacman")
+library("pacman")
 # 
 # p_install("dplyr", force = FALSE)
 # p_install("ggplot2", force = FALSE)
@@ -38,7 +38,11 @@ editor: visual
 # p_install("hereR", force = TRUE)
 # p_install("geojson", force = FALSE)
 # p_install("sp", force = TRUE)
+<<<<<<< HEAD
 # p_install("ggpubr", force = TRUE)
+=======
+ p_install("osmdata", force = FALSE)
+>>>>>>> 5a73759a4c2dd810f6834186504c5297527ac21b
 ```
 
 
@@ -72,7 +76,11 @@ library("geojsonsf")
 library("here")
 library("sp")
 library("hereR")
+<<<<<<< HEAD
 library("ggpubr")
+=======
+library("osmdata")
+>>>>>>> 5a73759a4c2dd810f6834186504c5297527ac21b
 
 #>>>>>>> f08770080dcba2ba396927d0228eb68552f0b88e
 
@@ -460,6 +468,99 @@ ggplot(raeubertochter_cor,aes(x, y, color = segment_id_cor)) +
 
 ```
 
+<<<<<<< HEAD
+=======
+# Task 4: Import Spatial Data
+
+```{r}
+
+
+st_layers("basic_data.gpkg")
+
+streets <- read_sf("gis_files/basic_data.gpkg", "street_network", promote_to_multi = FALSE) |> 
+   select(objektart, geom) |> 
+  mutate(
+    objektart = as.factor(objektart),
+    width = as.numeric(substr(objektart, start = 1, stop = 1)),
+    width_scaled = as.numeric(substr(objektart, start = 1, stop = 1)) *1000
+  ) |> 
+  na.omit()
+  
+?read_sf
+
+streets <- streets %>%
+  mutate(edgeID = c(1:n()))
+
+streets <- st_zm(streets, drop = TRUE)
+
+streets <- st_cast(streets, "LINESTRING")
+
+plot(streets)
+
+nodes <- streets %>%
+  st_coordinates() %>%
+  as_tibble() %>%
+  rename(edgeID = L1) %>%
+  group_by(edgeID) %>%
+  slice(c(1, n())) %>%
+  ungroup() %>%
+  mutate(start_end = rep(c('start', 'end'), times = n()/2))
+
+nodes <- nodes %>%
+  mutate(xy = paste(.$X, .$Y)) %>% 
+  mutate(nodeID = group_indices(., factor(xy, levels = unique(xy)))) %>%
+  select(-xy)
+
+nodes
+
+source_nodes <- nodes %>%
+  filter(start_end == 'start') %>%
+  pull(nodeID)
+
+target_nodes <- nodes %>%
+  filter(start_end == 'end') %>%
+  pull(nodeID)
+
+streets = streets %>%
+  mutate(from = source_nodes, to = target_nodes)
+
+streets
+
+tmap_mode("view")
+tm_shape(streets) + 
+  tm_lines() +
+  tm_shape(nodes) +
+  tm_dots()
+
+nodes <- nodes %>%
+  distinct(nodeID, .keep_all = TRUE) %>%
+  select(-c(edgeID, start_end)) %>%
+  st_as_sf(coords = c('X', 'Y')) %>%
+  st_set_crs(st_crs(streets))
+
+
+housing <- read_sf("gis_files/basic_data.gpkg", "housing_footprint") |> 
+   select(objektart, geom) |> 
+  mutate(
+    objektart = as.factor(objektart)
+  )
+
+
+surface <- read_sf("gis_files/basic_data.gpkg", "surface_type") |> 
+   select(art, geom) |> 
+  mutate(
+    art = as.factor(art)) |> 
+ filter(art == "fliessendes Gewässer" | art == "stehendes Gewässer" | art == "Strasse, Weg" | art == "Verkehrsinsel") |> 
+  na.omit()
+
+summary(surface$art)
+
+
+height <- terra::rast("gis_files/dhm25_zh.tif")
+
+```
+
+>>>>>>> 5a73759a4c2dd810f6834186504c5297527ac21b
 # Alternative trajectories with hereR:route()
 
 ```{r}
