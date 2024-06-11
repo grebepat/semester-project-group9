@@ -1,0 +1,213 @@
+---
+title: "visualizations"
+format: html
+editor: visual
+---
+
+# Task 3
+
+```{r}
+# visualize segments
+# p2 <- ggplot(all_routes_seg,aes(x, y, color = segment_id)) +
+#     scale_fill_brewer(palette = "Set3") +
+#     geom_point() +
+#     coord_fixed() +
+#     theme_minimal() +
+#     theme(legend.position = "none")+
+#     labs(title = "Deliveries", subtitle="Segmentation set at time_difference > 10s \nSegments < 60s removed") 
+# 
+# p2
+
+# visualize with tmap
+
+tmap_mode("plot")
+
+# visualize all trajectories
+tm_shape(surface, bbox = all_routes_seg) +
+  tm_polygons(border.col = NULL, col = "art", palette = my_palette, legend.show = F, ) +
+tm_shape(housing, bbox = all_routes_seg) +
+  tm_polygons(col = "grey25", border.col = "white", lwd = 0.5, alpha = .9) +
+tm_shape(streets, bbox = all_routes_seg) +
+  tm_lines(lwd = "width", scale = 2.5, legend.lwd.show = FALSE) +
+tm_layout(frame = FALSE) +
+  tm_basemap(server = NULL) +
+    tm_shape(all_routes_seg, bbox = all_routes_seg) +
+    tm_dots(col = "segment_id", size = 0.1, palette = "viridis", legend.show = FALSE) +
+  tmap_options(max.categories = 59)
+
+# visualize donner only
+tm_shape(surface, bbox = donner_seg) +
+  tm_polygons(border.col = NULL, col = "art", palette = my_palette, legend.show = F, ) +
+tm_shape(housing, bbox = donner_seg) +
+  tm_polygons(col = "grey25", border.col = "white", lwd = 0.5, alpha = .9) +
+tm_shape(streets, bbox = donner_seg) +
+  tm_lines(lwd = "width", scale = 2.5, legend.lwd.show = FALSE) +
+tm_layout(frame = FALSE) +
+  tm_basemap(server = NULL) +
+    tm_shape(all_routes_seg, bbox = donner_seg) +
+    tm_dots(col = "segment_id", size = 0.1, palette = "viridis", legend.show = FALSE) +
+  tmap_options(max.categories = 59)
+
+# visualize raeubertochter only
+tm_shape(surface, bbox = raeubertochter_seg) +
+  tm_polygons(border.col = NULL, col = "art", palette = my_palette, legend.show = F, ) +
+tm_shape(housing, bbox = raeubertochter_seg) +
+  tm_polygons(col = "grey25", border.col = "white", lwd = 0.5, alpha = .9) +
+tm_shape(streets, bbox = raeubertochter_seg) +
+  tm_lines(lwd = "width", scale = 2.5, legend.lwd.show = FALSE) +
+tm_layout(frame = FALSE) +
+  tm_basemap(server = NULL) +
+    tm_shape(all_routes_seg, bbox = raeubertochter_seg) +
+    tm_dots(col = "segment_id", size = 0.1, palette = "viridis", legend.show = FALSE) +
+  tmap_options(max.categories = 59)
+
+# 
+# p3 <- ggplot(donner_seg, aes(x, y, color = segment_id)) +
+#     geom_path() +
+#     geom_point() +
+#     scale_fill_brewer(palette = "Set1") +
+#     coord_fixed() +
+#     theme(legend.position = "none")+
+#     labs(title = "Deliveries", subtitle="Segmentation set at time_difference > 10s \nSegments < 120s removed")  
+# 
+# p4 <- ggplot(raeubertochter_seg, aes(x, y, color = segment_id)) +
+#     geom_path() +
+#     geom_point() +
+#     scale_fill_brewer(palette = "Set1") +
+#     coord_fixed() +
+#     theme(legend.position = "none")+
+#     labs(title = "Deliveries", subtitle="Segmentation set at time_difference > 10s \nSegments < 120s removed")  
+# 
+
+```
+
+# Task 4: Lost in Transit: Tackling Tunnel GPS Blackouts for Bike Messenger
+
+```{r}
+
+ggplot(donner_cor,aes(x, y, color = segment_id_cor)) +
+    geom_path() +
+    geom_point() +
+    scale_fill_brewer(palette = "Set1") +
+    coord_fixed() +
+    theme(legend.position = "none")+
+    labs(title = "Deliveries", subtitle="Segmentation set at time_difference > 10s \nSegments < 120s removed \nTunnel Challenge incl.")
+
+ggplot(raeubertochter_cor,aes(x, y, color = segment_id_cor)) +
+    geom_path() +
+    geom_point() +
+    scale_fill_brewer(palette = "Set1") +
+    coord_fixed() +
+    theme(legend.position = "none")+
+    labs(title = "Deliveries", subtitle="Segmentation set at time_difference > 10s \nSegments < 120s removed \nTunnel Challenge incl.")
+
+
+```
+
+
+# Task 5 Alternative trajectories with hereR:route()
+
+```{r}
+tmap_mode("view")
+tm_shape(streets, bbox = extent2) +
+  tm_lines(lwd = "width", scale = 1.5, legend.lwd.show = FALSE) +
+tm_shape(alternative) +
+  tm_lines(col = "rank", lwd = 2) +
+tm_shape(df_even) +
+  tm_dots(col = "lightblue", size = 2) +
+tm_shape(df_odd) +
+  tm_dots(col = "gold", size = 2) +
+tm_shape(donner_vis) +
+  tm_dots(col = "purple", size = .15) +
+  tm_shape(pts) +
+  tm_dots(col = "red") +
+ tm_layout(frame = FALSE, bg.color = "transparent")
+
+
+tm1 <- tm_shape(surface, bbox = extent2) +
+  tm_polygons(border.col = NULL, col = "art", palette = my_palette, legend.show = F, ) +
+tm_shape(housing, bbox = extent) +
+  tm_polygons(col = "grey25", border.col = "white", lwd = 0.5, alpha = .9) +
+tm_shape(streets, bbox = extent) +
+  tm_lines(lwd = "width", scale = 2.5, legend.lwd.show = FALSE) +
+tm_layout(frame = FALSE) +
+  tm_basemap(server = NULL)
+
+
+tm10 <- tm_shape(streets, bbox = extent2) +
+  tm_lines(lwd = "width", scale = 2.5, legend.lwd.show = FALSE) +
+tm_shape(housing, bbox = extent2) +
+  tm_polygons(col = "grey25", border.col = "white", lwd = 0.5, alpha = .9) +
+  tm_layout(frame = FALSE)
+
+tmap_save(tm10, "presentation/overview_routing.png", width =300, height = 150, dpi = 1000, units = "mm")
+
+
+tm11 <- tm_shape(donner_vis, bbox = extent2) +
+  tm_symbols(size = 0.5, col = "red",  alpha = 0.6, border.col = "NA") +
+  tm_layout(frame = FALSE, bg.color = "transparent") 
+
+tmap_save(tm11, "presentation/donner_routing.png", width =300, height = 150, dpi = 1000, units = "mm", bg="transparent")
+
+
+tm12 <-  tm_shape(df_even,  bbox = extent2) +
+  tm_dots(col = "steelblue", size = 2.5, border.col = "NA", alpha = 0.9) +
+tm_shape(df_odd) +
+  tm_dots(col = "gold", size = 2.5, border.col = "NA", alpha = 0.9) +
+  tm_layout(frame = FALSE, bg.color = "transparent") 
+
+tmap_save(tm12, "presentation/start_end_routing.png", width =300, height = 150, dpi = 1000, units = "mm", bg="transparent")
+
+
+my_palette <- c("#11E2A1", "#9E1FA2")
+
+tm13 <-  tm_shape(df_even,  bbox = extent2) +
+  tm_dots(col = "steelblue", size = 2.5, border.col = "NA", alpha = 0.9) +
+tm_shape(df_odd) +
+  tm_dots(col = "gold", size = 2.5, border.col = "NA", alpha = 0.9) +
+tm_shape(alternative) +
+  tm_lines(col = "rank", lwd = 5, palette = my_palette, border.col = "NA", legend.col.show = F) +
+
+  tm_layout(frame = FALSE, bg.color = "transparent") 
+
+tmap_save(tm13, "presentation/alternative_routing.png", width =300, height = 150, dpi = 1000, units = "mm", bg="transparent")
+
+
+
+??hereR
+
+tmap_mode("plot")
+tm_shape(streets, bbox = donner_vis) +
+  tm_lines(lwd = "width", scale = 1.5, legend.lwd.show = FALSE) +
+tm_shape(alternative) +
+  tm_lines(col = "rank", lwd = 2) +
+tm_shape(df_even) +
+  tm_dots(col = "lightblue", size = 2) +
+tm_shape(df_odd) +
+  tm_dots(col = "gold", size = 2) +
+tm_shape(donner_vis) +
+  tm_dots(col = "purple", size = .15) 
+
+```
+
+## Task 6 Map Matching
+
+```{r}
+tm_shape(street_network) +
+  tm_lines() +
+tm_shape(nearest_route) +
+  tm_lines(lty = 3) +
+tm_shape(all_routes_seg_tunnel_cor$geometry) +
+  tm_dots(col = "purple") +
+tm_shape(near_to_route) +
+  tm_dots(col = "lightblue")
+
+
+tm_shape(street_network) +
+  tm_lines() +
+tm_shape(nearest_alternative) +
+  tm_lines(lty = 3) +
+tm_shape(alternative$geometry) +
+  tm_dots(col = "purple")
+```
+
