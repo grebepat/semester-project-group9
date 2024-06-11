@@ -4,48 +4,52 @@ format: html
 editor: visual
 ---
 
-
-
 # Install Packages
 
 ```{r}
+# install.packages("pacman")
+# library("pacman")
+# 
+# p_install("dplyr", force = FALSE)
+# p_install("ggplot2", force = FALSE)
+# p_install("readr", force = FALSE)
+# p_install("tidyr", force = FALSE)
+# p_install("sf", force = FALSE)
+# p_install("terra", force = FALSE)
+# p_install("tmap", force = FALSE)
+# p_install("zoo", force = FALSE)
+# p_install("units", force = FALSE)
+# p_install("plotly", force = FALSE)
+# p_install("patchwork", force = FALSE)
+# p_install("tidyverse", force = FALSE)
+# p_install("rjson", force = FALSE)
+# p_install("jsonlite", force = FALSE)
+# p_install("leaflet", force = TRUE)
+# p_install("shiny", force = TRUE)
+# p_install("XML", force = TRUE)
+# p_install("lubridate", force = TRUE)
+# p_install("ggh4x", force = TRUE)
+# p_install("forcats", force = TRUE)
+# p_install("purrr", force = TRUE)
+# p_install("viridis", force = TRUE)
+# p_install("osrm", force = TRUE)
+# p_install("httr", force = TRUE)
+# p_install("mapmatchr", force = TRUE)
+# p_install("hereR", force = TRUE)
+# p_install("geojson", force = FALSE)
+# p_install("sp", force = TRUE)
+```
 
-install.packages("pacman")
-library("pacman")
 
-p_install("dplyr", force = FALSE)
-p_install("ggplot2", force = FALSE)
-p_install("readr", force = FALSE)
-p_install("tidyr", force = FALSE)
-p_install("sf", force = FALSE)
-p_install("sp", force = FALSE)
-p_install("terra", force = FALSE)
-p_install("tmap", force = FALSE)
-p_install("zoo", force = FALSE)
-p_install("units", force = FALSE)
-p_install("plotly", force = FALSE)
-p_install("patchwork", force = FALSE)
-p_install("tidyverse", force = FALSE)
-p_install("rjson", force = FALSE)
-p_install("jsonlite", force = FALSE)
-p_install("leaflet", force = TRUE)
-p_install("shiny", force = TRUE)
-p_install("XML", force = TRUE)
-p_install("lubridate", force = TRUE)
-p_install("ggh4x", force = TRUE)
-p_install("forcats", force = TRUE)
-p_install("purr", force = TRUE)
-p_install("viridis", force = TRUE)
-p_install("osrm", force = TRUE)
-p_install("httr", force = TRUE)
-p_install("mapmatchr", force = TRUE)
-p_install("hereR", force = TRUE)
 
+
+```{r}
 library("ggh4x")
 library("dplyr")
 library("ggplot2")
 library("tidyr")
 library("sf")
+library("sp")
 library("terra")
 library("tmap")
 library("zoo")
@@ -60,24 +64,25 @@ library("XML")
 library("lubridate")
 library("shiny")
 library("forcats")
-library("purr")
+library("purrr")
 library("viridis")
 library("osrm")
 library("httr")
 library("mapmatchr")
+library("geojsonsf")
 library("here")
 library("sp")
+library("hereR")
+
+#>>>>>>> f08770080dcba2ba396927d0228eb68552f0b88e
 
 ```
 
-
 # Task 1: Import Express: Bringing GPS Data Onboard
 
-Folgend werden alle .gpx-Files aus dem Ordner *GPS_Daten* eingelesen. Aus den .gpx-Files werden die Koordinaten herausgelesen und jede gefahrene Route / Aktivität in einem neuen Dataframe abgespeichert. Die Dataframes landen alle in einer Liste `single_routes` und können über diese abgerufen und dargestellt werden.In einer weiteren Variate werden alle Daten in einen einzigen Data Frame verpackt `all_routes`.
+Folgend werden alle .gpx-Files aus dem Ordner *GPS_Daten* eingelesen. Aus den .gpx-Files werden die Koordinaten herausgelesen und jede gefahrene Route / Aktivität in einem neuen Dataframe abgespeichert. Die Dataframes landen alle in einer Liste `single_routes` und können über diese abgerufen und dargestellt werden. In einer weiteren Variante werden alle Daten in einen einzigen Data Frame verpackt `all_routes`.
 
 ```{r}
-
-
 # generate a list of all filenames including the path from the subfolder they are stored in
 file <- list.files("gps_files_shared", recursive = TRUE, pattern = "\\.gpx$", full.names = TRUE)
 
@@ -116,14 +121,35 @@ all_routes <- do.call(rbind, single_routes)
 raeubertochter_raw <- filter(all_routes, messenger == "raeubertochter")
 donner_raw <- filter(all_routes, messenger == "donner")
 
+# filter only messenger rides. We do this by filtering the routes that have taken place in the city of zurich
 
+# Define simple bounding box for Zurich
+zurich <- st_bbox(c(xmin = 8.387726, ymin = 47.301000, xmax = 8.658916, ymax = 47.462420), crs = st_crs(4326))
+
+# Convert the bounding box to a polygon
+zurich <- st_as_sfc(zurich)
+
+# Transform the CRS of zurich to match that of donner_raw
+zurich <- st_transform(zurich, st_crs(donner_raw))
+
+tm_shape(zurich) +
+  tm_polygons()
+
+# Filter the points within the Zurich bounding box
+donner_filtered <- donner_raw[st_intersects(donner_raw, zurich, sparse = FALSE), ]
+
+tmap_mode("view")
+
+tm_shape(donner_filtered) +
+  tm_dots()
+
+all_routes2 <- donner_filtered %>% 
+  bind_rows(raeubertochter_raw)
 
 # Quick overview
 tmap_mode("plot")
 tm_shape(single_routes[[2]]) +
-  tm_dots( col = "messenger", palette = "seq", border.col = NULL)
-
-
+  tm_dots(col = "messenger", palette = "seq", border.col = NULL)
 ```
 
 # Task 2: Signal Sync: Assessing Sampling Intervals Across Messenger GPS Systems
@@ -164,7 +190,7 @@ ggplot(all_routes, aes(x = time_difference)) +
 
 # Both with similar but slightly different sampling regimes, raeubertochter with an intervall of 1 second- It seems that static time is already removed..
 
-# Donner with more variation between fixes, but still short intervalls, might need another segmentation...
+# Donner with more variation between fixes, but still short intervals, might need another segmentation...
 
 ```
 
@@ -173,7 +199,7 @@ ggplot(all_routes, aes(x = time_difference)) +
 ```{r}
 
 
-# First we try the same segmentation method for all messenegrs
+# First we try the same segmentation method for all messengers
 
 # create a moving time window
 all_routes_seg <- all_routes |> 
@@ -197,9 +223,7 @@ all_routes_seg <- all_routes_seg |> # calculate rowwise mean distance per messen
 
 # create a new column static, based on time_difference (over 20s time difference)
 all_routes_seg <- all_routes_seg |> 
-  mutate(
-    new_segment = timeMean > 20
-  )
+  mutate(new_segment = timeMean > 20)
 
 # it assigns unique IDs based on the column static
 rle_id <- function(vec) {
@@ -414,224 +438,11 @@ height <- terra::rast("gis_files/dhm25_zh.tif")
 
 ```
 
-
-
-## Map Matching
+# Alternative trajectories with hereR:route()
 
 ```{r}
 
-library(sf)
-library(tmap)
-
-################################### Nils #######################################################
-
-# Define the coordinates of the polygon
-coords <- rbind(c(2681695, 1247822), c(2683188, 1247822), c(2683188, 1246616), c(2681695, 1246616), c(2681695, 1247822))
-
-# Create a polygon
-polygon <- st_polygon(list(coords))
-
-# Convert to spatial object
-extent <- st_sfc(polygon, crs = 2056)
-
-
-# since we want to find the closest location on the road over ALL roads
-# we need to create a union of the roads first.
-street_network <- st_union(streets)
-
-?st_nearest_points
-
-# Let's assume 'gps_locations' are your existing points
-# gps_locations <- ...
-
-# Now we can get the nearest point for each GPS location
-nearest <- st_nearest_points(all_routes_seg_tunnel_cor, street_network)
-
-# The output is a line for each point
-# Now we need convert the output from LINE to POINT. 
-# This doubles the number of features
-near_p <- st_cast(nearest, "POINT")
-
-# now we subset the points. Even numbers are the new, mapmatched points.
-near_to <- near_p[c(FALSE,TRUE)]
-
-# Update the geometry of the original points with the new locations
-st_geometry(all_routes_seg_tunnel_cor) <- st_geometry(near_to)
-
-tmap_mode("plot")
-
-
-tm_shape(street_network, bbox = extent) + 
-  tm_lines() +
-tm_shape(nearest) + 
-  tm_lines(lty = 3) +
-tm_shape(all_routes_seg_tunnel_cor$geometry) + 
-  tm_dots(col = "purple") + 
-tm_shape(near_to) + 
-  tm_dots(col = "lightblue")
-
-
-
-
-
-########################################### Valhalla ####################################################
-
-system("docker pull valhalla/valhalla")
-
-?jsonlite
-
-
-map_matching <- function(df) {
-  meili_coordinates <- jsonify::to_json(df)
-  meili_head <- '{\"shape\":'
-  meili_tail <- ",\"search_radius\": 50, \"shape_match\":\"map_snap\", \"costing\":\"auto\", \"format\":\"osrm\"}"
-  meili_request_body <- paste(meili_head, meili_coordinates, meili_tail, sep = "")
-  url <- "http://localhost:8002/trace_route"
-  headers <- list('Content-type' = 'application/json')
-  data <- str(meili_request_body)
-  r <- httr::POST(url, body = data, headers = headers)
-  if (r$status_code == 200) {
-    response_text <- jsonlite::fromJSON(content(r, "text"), simplifyVector = FALSE)
-    resp <- str(response_text$tracepoints)
-    resp <- gsub("None", "{'matchings_index': '#', 'name': '', 'waypoint_index': '#', 'alternatives_count': 0, 'distance': 0, 'location': [0.0, 0.0]}", resp)
-    resp <- gsub("'", "\"", resp)
-    matched_df <- df.copy()
-    df_response <- jsonlite::fromJSON(resp)
-    for (i in seq_along(df_response)) {
-      if (matched_df$lon[i] != 0.0) {
-        matched_df$lon[i] <- df_response$location[[i]][1]
-        matched_df$lat[i] <- df_response$location[[i]][2]
-      }
-    }
-    return(matched_df)
-  }
-}
-
-map_matching(all_routes_seg_tunnel_cor)
-
-
-
-#################################### MAPMATCHR #######################################################
-
-p_install("mapamtchr", force = TRUE)
-
-```
-
-# Enrich street network
-
-```{r}
-
-taj <- all_routes_seg_tunnel_cor |> 
-  select(id, messenger, shift, time, geometry, duration, segment_id_cor)
-
-#tm_shape(all_routes_seg_tunnel_cor) +
- # tm_dots()  +
-  #tm_shape(streets) +
-  #tm_lines()
-
-taj2 <- st_buffer(taj, 0.25)
-
-taj_width <- st_join(taj2, streets, left = TRUE, suffix = "street", join = st_intersects)
-
-
-taj_count <- taj_width |> 
-  st_drop_geometry() |> 
-  group_by(messenger, segment_id_cor, width) |> 
-  summarise(count = n()) |> 
-  mutate(total = sum(count), 
-         percentage = count / total * 100) |> 
-ungroup()
-
-
-head(taj_width)
-
-taj_width <-  st_centroid(taj_width, crs = 2056)
-
-
-
-plot(height)
-
-extracted_height <- extract(height, taj_width)
-
-taj_width$height <- round(extracted_height$dhm25_zh,2)
-
-slope <- terrain(height, v = "slope", unit = "degrees", neighbors = 8)
-extracted_slope <- extract(slope, taj_width)
-taj_width$slope <- round(extracted_slope$slope,2)
-
-taj_enriched <- taj_width |> 
-  select(-width_scaled, -objektart)
-
-
-
-
-
-taj_mahal <- taj_enriched %>%
-  st_transform(crs = 2056) |> 
-  arrange(segment_id_cor) %>%
-  group_by(segment_id_cor) %>%
-  mutate(height_diff = c(0, diff(height)),
-         cumulative_up = cumsum(ifelse(height_diff > 0, height_diff, 0)),
-         tot_up = sum(ifelse(height_diff > 0, height_diff, 0)),
-         cumulative_down = cumsum(ifelse(height_diff < 0, height_diff, 0)),data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABIAAAASCAYAAABWzo5XAAAAbElEQVR4Xs2RQQrAMAgEfZgf7W9LAguybljJpR3wEse5JOL3ZObDb4x1loDhHbBOFU6i2Ddnw2KNiXcdAXygJlwE8OFVBHDgKrLgSInN4WMe9iXiqIVsTMjH7z/GhNTEibOxQswcYIWYOR/zAjBJfiXh3jZ6AAAAAElFTkSuQmCC
-         tot_down = sum(ifelse(height_diff < 0, height_diff, 0)),
-         lead_geom = lead(geometry),
-         travel_dist = sqrt(round(ifelse(!is.na(lead_geom), st_distance(lead_geom, geometry, by_element = TRUE), 0), 1))^2,
-         slope_calc = atan(height_diff / travel_dist), 
-         cum_slope_up = cumsum(ifelse(slope_calc > 0, slope_calc, 0)),
-         slope_tot_up = sum(ifelse(slope_calc > 0, slope_calc, 0)),
-         cum_slope_down = cumsum(ifelse(slope_calc < 0, slope_calc, 0)),
-         slope_tot_down = sum(ifelse(slope_calc < 0, slope_calc, 0)),
-         
-         
-         
-         ) %>%
-  ungroup()
-
-
-
-
-
-subset_taj <- taj_enriched %>%
-  filter(segment_id_cor %in% sample(unique(segment_id_cor), 5)) # Adjust the number of segments as needed
-
-# Apply the same operations but print out the intermediate results
-subset_taj <- subset_taj %>%
-  st_transform(crs = 2056) %>%
-  arrange(segment_id_cor) %>%
-  group_by(segment_id_cor) %>%
-  mutate(
-    lag_geom = lag(geometry),
-    travel_dist = st_distance(lag_geom, geometry)
-  ) 
-
-# Print out the results
-head(subset_taj)
-
-
-
-
-euclid <- function(x1, x2, y1, y2){
-  distance <- sqrt((x2 - x1)^2 + (y2 - y1)^2)
-  return(distance)
-}
-
-
-
-
-taj_mahal |> 
-  filter(segment_id_cor == 1 | segment_id_cor == 2) |> 
- ggplot( aes(x = time, y = travel_dist, color = segment_id_cor)) +
-  geom_line() +
-  scale_fill_brewer(palette = "Set1")  # Use a color palette that suits your data
-
-```
-
-# Alternative trajectories
-
-```{r}
-
-a_to_b <- taj_mahal |> 
+a_to_b <- all_routes_seg_tunnel_cor |> 
   group_by(segment_id_cor) |> 
   slice(c(1, n())) |> 
   ungroup()
@@ -653,11 +464,16 @@ df_even <- df_even[1, ]
 df_odd <- a_to_b[seq(1, nrow(a_to_b), by = 2), ]
 df_odd <- df_odd[1,]
 
+?route()
 
-
-alternative <- route(origin = df_odd, destination = df_even, transport_mode = "bicycle", traffic = FALSE, results = 5, routing_mode = "short")
-
+alternative <- route(origin = df_odd, destination = df_even, transport_mode = "bicycle", traffic = FALSE, results = 1 , routing_mode = "fast")
 plot(alternative)
+
+
+alternative <- st_transform(alternative, crs = 2056)
+
+alternative <- st_cast(alternative, "POINT")
+alternative <- st_zm(alternative, drop = TRUE)
 
 
 donner_vis <- donner_cor |> 
@@ -677,11 +493,10 @@ polygon <- st_polygon(list(coords))
 extent2 <- st_sfc(polygon, crs = 2056)
 
 
-
 streets <- st_intersection(streets, extent2)
 housing <- st_intersection(housing, extent2)
 
-tmap_mode("plot")
+tmap_mode("view")
 tm_shape(streets, bbox = extent2) +
   tm_lines(lwd = "width", scale = 1.5, legend.lwd.show = FALSE) +
 tm_shape(alternative) +
@@ -692,6 +507,8 @@ tm_shape(df_odd) +
   tm_dots(col = "gold", size = 2) +
 tm_shape(donner_vis) +
   tm_dots(col = "purple", size = .15) +
+  tm_shape(pts) +
+  tm_dots(col = "red") +
  tm_layout(frame = FALSE, bg.color = "transparent")
 
 
@@ -744,16 +561,491 @@ tm_shape(alternative) +
 tmap_save(tm13, "presentation/alternative_routing.png", width =300, height = 150, dpi = 1000, units = "mm", bg="transparent")
 
 
+
+??hereR
+
+tmap_mode("plot")
+tm_shape(streets, bbox = donner_vis) +
+  tm_lines(lwd = "width", scale = 1.5, legend.lwd.show = FALSE) +
+tm_shape(alternative) +
+  tm_lines(col = "rank", lwd = 2) +
+tm_shape(df_even) +
+  tm_dots(col = "lightblue", size = 2) +
+tm_shape(df_odd) +
+  tm_dots(col = "gold", size = 2) +
+tm_shape(donner_vis) +
+  tm_dots(col = "purple", size = .15) 
+
 ```
 
 
+## Map Matching
+
+```{r}
+
+library(sf)
+library(tmap)
+
+################################### Nils #######################################################
+
+# Define the coordinates of the polygon
+coords <- rbind(c(2681695, 1247822), c(2683188, 1247822), c(2683188, 1246616), c(2681695, 1246616), c(2681695, 1247822))
+
+# Create a polygon
+polygon <- st_polygon(list(coords))
+
+# Convert to spatial object
+extent <- st_sfc(polygon, crs = 2056)
+
+
+# since we want to find the closest location on the road over ALL roads
+# we need to create a union of the roads first.
+street_network <- st_union(streets)
+
+?st_nearest_points
+
+# Let's assume 'gps_locations' are your existing points
+# gps_locations <- ...
+
+# Now we can get the nearest point for each GPS location
+nearest_route <- st_nearest_points(all_routes_seg_tunnel_cor, street_network)
+nearest_alternative <- st_nearest_points(alternative, street_network)
+
+# The output is a line for each point
+# Now we need convert the output from LINE to POINT. 
+# This doubles the number of features
+near_p_route <- st_cast(nearest_route, "POINT")
+near_p_alternative <- st_cast(nearest_alternative, "POINT")
+
+# now we subset the points. Even numbers are the new, mapmatched points.
+near_to_route <- near_p_route[c(FALSE,TRUE)]
+near_to_alternative <- near_p_alternative[c(FALSE,TRUE)]
+
+# Update the geometry of the original points with the new locations
+st_geometry(all_routes_seg_tunnel_cor) <- st_geometry(near_to_route)
+st_geometry(alternative) <- st_geometry(near_to_alternative)
+
+
+tmap_mode("view")
+
+
+tm_shape(street_network) + 
+  tm_lines() +
+tm_shape(nearest_route) + 
+  tm_lines(lty = 3) +
+tm_shape(all_routes_seg_tunnel_cor$geometry) + 
+  tm_dots(col = "purple") + 
+tm_shape(near_to_route) + 
+  tm_dots(col = "lightblue")
+
+
+tm_shape(street_network) + 
+  tm_lines() +
+tm_shape(nearest_alternative) + 
+  tm_lines(lty = 3) +
+tm_shape(alternative$geometry) + 
+  tm_dots(col = "purple") 
+
+
+
+```
+
+# Enrich street network
+
+```{r}
+# Enrich dataset for actual route
+traj <- all_routes_seg_tunnel_cor |> 
+  select(id, messenger, shift, time, geometry, duration, segment_id_cor)
+
+#tm_shape(all_routes_seg_tunnel_cor) +
+ # tm_dots()  +
+  #tm_shape(streets) +
+  #tm_lines()
+
+traj2 <- st_buffer(traj, 0.25)
+
+traj_width <- st_join(traj2, streets, left = TRUE, suffix = "street", join = st_intersects)
+
+
+traj_count <- traj_width |> 
+  st_drop_geometry() |> 
+  group_by(messenger, segment_id_cor, width) |> 
+  summarise(count = n()) |> 
+  mutate(total = sum(count), 
+         percentage = count / total * 100) |> 
+ungroup()
+
+
+head(traj_width)
+
+traj_width <-  st_centroid(traj_width, crs = 2056)
+
+
+
+plot(height)
+
+extracted_height <- extract(height, traj_width)
+
+traj_width$height <- round(extracted_height$dhm25_zh,2)
+
+slope <- terrain(height, v = "slope", unit = "degrees", neighbors = 8)
+extracted_slope <- extract(slope, traj_width)
+traj_width$slope <- round(extracted_slope$slope,2)
+
+traj_enriched <- traj_width |> 
+  select(-width_scaled, -objektart)
+
+
+
+
+
+traj_enriched_final <- traj_enriched %>%
+  st_transform(crs = 2056) |> 
+  arrange(segment_id_cor) %>%
+  group_by(segment_id_cor) %>%
+  mutate(height_diff = c(0, diff(height)),
+         height_cumulative_up = cumsum(ifelse(height_diff > 0, height_diff, 0)),
+         height_cumulative_down = cumsum(ifelse(height_diff < 0, height_diff, 0)),
+         height_tot_up = sum(ifelse(height_diff > 0, height_diff, 0), na.rm = T),
+         height_tot_down = sum(ifelse(height_diff < 0, height_diff, 0), na.rm = T),
+         lead_geom = lead(geometry),
+         travel_dist = sqrt(round(ifelse(!is.na(lead_geom), st_distance(lead_geom, geometry, by_element = TRUE), 0), 1))^2,
+         slope_calc = ifelse(travel_dist != 0, atan(height_diff / travel_dist), 0), 
+         slope_cumulative_up = cumsum(ifelse(slope_calc > 0, slope_calc, 0)),
+         slope_cumultaive_down = cumsum(ifelse(slope_calc < 0, slope_calc, 0)),
+         slope_tot_up = sum(ifelse(slope_calc > 0, slope_calc, 0), na.rm = T),
+         slope_tot_down = sum(ifelse(slope_calc < 0, slope_calc, 0), na.rm = T),
+         travel_dist_tot = sum(ifelse(travel_dist > 0, travel_dist, 0), na.rm = T),
+         n_fixes = n()) |> 
+  ungroup()
+
+
+width_preference <- traj_enriched_final %>%
+  group_by(messenger, segment_id_cor, width) %>%
+  summarise(
+    sum = sum(travel_dist, na.rm = T)
+  ) |> 
+  group_by(messenger) |> 
+  mutate(
+    width = as.factor(width),
+    tot = sum(sum),
+    perc = (sum / tot) * 100,
+    pref = perc - 16.67
+  )
+
+
+
+
+
+# enrich dataset for alternatives
+
+
+# Enrich dataset for actual route
+alt <- alternative |> 
+  select(id, rank,  geometry)
+
+#tm_shape(all_routes_seg_tunnel_cor) +
+ # tm_dots()  +
+  #tm_shape(streets) +
+  #tm_lines()
+
+alt2 <- st_buffer(alt, 0.25)
+
+alt_width <- st_join(alt2, streets, left = TRUE, suffix = "street", join = st_intersects)
+
+
+alt_count <- alt_width |> 
+  st_drop_geometry() |> 
+  group_by(id, width) |> 
+  summarise(count = n()) |> 
+  mutate(total = sum(count), 
+         percentage = count / total * 100) |> 
+ungroup()
+
+
+head(traj_width)
+
+alt_width <-  st_centroid(alt_width, crs = 2056)
+
+
+
+plot(height)
+
+extracted_height_alt <- extract(height, alt_width)
+
+alt_width$height <- round(extracted_height_alt$dhm25_zh,2)
+
+slope_alt <- terrain(height, v = "slope", unit = "degrees", neighbors = 8)
+extracted_slope_alt <- extract(slope_alt, alt_width)
+alt_width$slope <- round(extracted_slope_alt$slope,2)
+
+alt_enriched <- alt_width |> 
+  select(-width_scaled, -objektart)
+
+
+
+
+
+alt_enriched_final <- alt_enriched %>%
+  st_transform(crs = 2056) |> 
+  arrange(id) %>%
+  group_by(id) %>%
+  mutate(height_diff = c(0, diff(height)),
+         height_cumulative_up = cumsum(ifelse(height_diff > 0, height_diff, 0)),
+         height_cumulative_down = cumsum(ifelse(height_diff < 0, height_diff, 0)),
+         height_tot_up = sum(ifelse(height_diff > 0, height_diff, 0), na.rm = T),
+         height_tot_down = sum(ifelse(height_diff < 0, height_diff, 0), na.rm = T),
+         lead_geom = lead(geometry),
+         travel_dist = sqrt(round(ifelse(!is.na(lead_geom), st_distance(lead_geom, geometry, by_element = TRUE), 0), 1))^2,
+         slope_calc = ifelse(travel_dist != 0, atan(height_diff / travel_dist), 0), 
+         slope_cumulative_up = cumsum(ifelse(slope_calc > 0, slope_calc, 0)),
+         slope_cumultaive_down = cumsum(ifelse(slope_calc < 0, slope_calc, 0)),
+         slope_tot_up = sum(ifelse(slope_calc > 0, slope_calc, 0), na.rm = T),
+         slope_tot_down = sum(ifelse(slope_calc < 0, slope_calc, 0), na.rm = T),
+         travel_dist_tot = sum(ifelse(travel_dist > 0, travel_dist, 0), na.rm = T),
+         n_fixes = n()) |> 
+  ungroup()
+
+
+width_preference_alt <- alt_enriched_final %>%
+  group_by(id, width) %>%
+  summarise(
+    sum = sum(travel_dist, na.rm = T)
+  ) |> 
+  group_by(id) |> 
+  mutate(
+    width = as.factor(width),
+    tot = sum(sum),
+    perc = (sum / tot) * 100,
+    pref = perc - 16.67
+  )
+ungroup()
+summarise(pref)
+
+
+
+
+
+
+
+
+
+
+
+
+ggplot(width_preference) +
+  geom_boxplot(aes(x = width, y = perc))
+
+
+ggplot(width_preference_alt) +
+  geom_boxplot(aes(x = width, y = perc))
+
+
+ggplot(width_preference_alt, aes(x= pref , y= width, group = width )) +
+  geom_bar(stat = "identity", position = position_dodge2(0.9, padding = 0), width = 0.6) 
+
+  
+  scale_pattern_manual(values = c("1931-2011" = "none", "2011-2023" = "stripe", "1931-2023" = "none")) +
+  labs(y="Art", x="Höhenverschiebung [m]") +
+  guides(x = guide_axis_truncated(trunc_lower = -150, trunc_upper = 600),
+         y = "axis_truncated", 
+        fill = guide_legend(label.position = "bottom")) +
+   theme_classic() +
+  theme(axis.title.y = element_text(size = 6, margin = margin(t = 0, r = 15, b = 0, l = 0)),
+        axis.title.x = element_text(size = 6, margin = margin(t = 10, r = 0, b = 0, l = 0)),
+        axis.line = element_line(size=0.3),
+        axis.ticks.y = element_line(size=0.3),
+        axis.ticks.x = element_line(size=0.6),
+        axis.text.x = element_text(size = 6, margin = margin(t = 7.5, r = 0, b = 0, l = 0)),
+        axis.text.y = element_text(face = "italic", size = 6, margin = margin(t = 0, r = 7.5, b = 0, l = 0)),
+        legend.position = "bottom",
+        legend.text = element_text(size = 6),
+        legend.key.width = unit(0.3, 'cm'),
+        legend.key.height = unit(0.2, 'cm'),
+        legend.key.spacing.x = unit(0.5, 'cm'),
+        legend.title = element_blank()
+        )
+
+
+
+ subset_taj <- taj_enriched %>%
+  filter(segment_id_cor %in% sample(unique(segment_id_cor), 5)) # Adjust the number of segments as needed
+
+# Apply the same operations but print out the intermediate results
+subset_taj <- subset_taj %>%
+  st_transform(crs = 2056) %>%
+  arrange(segment_id_cor) %>%
+  group_by(segment_id_cor) %>%
+  mutate(
+    lag_geom = lag(geometry),
+    travel_dist = st_distance(lag_geom, geometry)
+  ) 
+
+# Print out the results
+head(subset_taj)
+
+
+
+
+euclid <- function(x1, x2, y1, y2){
+  distance <- sqrt((x2 - x1)^2 + (y2 - y1)^2)
+  return(distance)
+}
+
+
+
+
+taj_mahal |> 
+  filter(segment_id_cor == 1 | segment_id_cor == 2) |> 
+ ggplot( aes(x = time, y = travel_dist, color = segment_id_cor)) +
+  geom_line() +
+  scale_fill_brewer(palette = "Set1")  # Use a color palette that suits your data
+
+```
+
+# Alternative trajectories with hereR:route()
+
+```{r}
+
+a_to_b <- traj_enriched_final |> 
+  group_by(segment_id_cor) |> 
+  slice(c(1, n())) |> 
+  ungroup()
+
+tmap_mode("plot")
+tm_shape(a_to_b) + 
+  tm_dots() 
+
+library("hereR")
+set_key("PARpVmlSSQAeuGjMhIdg94LMi9s1ha4UShazq0j8sAo")
+
+
+# Create a dataframe with even rows
+df_even <- a_to_b[seq(2, nrow(a_to_b), by = 2), ]
+df_even <- df_even[1, ]
+
+
+# Create a dataframe with odd rows
+df_odd <- a_to_b[seq(1, nrow(a_to_b), by = 2), ]
+df_odd <- df_odd[1,]
+
+?route()
+
+alternative <- route(origin = df_odd, destination = df_even, transport_mode = "bicycle", traffic = FALSE, results = 1 , routing_mode = "fast")
+plot(alternative)
+
+
+
+
+donner_vis <- donner_cor |> 
+  filter(segment_id_cor == 1)
+
+
+
+extent2 <- st_transform(st_buffer(alternative, 200), crs = 2056)
+st_bbox(extent2)
+
+coords <- rbind(c(2679514  , 1249013 ), c(2683075, 1249013 ), c(2683075, 1247635), c(2679514 , 1247635), c(2679514 , 1249013 ))
+
+# Create a polygon
+polygon <- st_polygon(list(coords))
+
+# Convert to spatial object
+extent2 <- st_sfc(polygon, crs = 2056)
+
+pts <- st_cast(alternative, "POINT")
+
+streets <- st_intersection(streets, extent2)
+housing <- st_intersection(housing, extent2)
+
+tmap_mode("view")
+tm_shape(streets, bbox = extent2) +
+  tm_lines(lwd = "width", scale = 1.5, legend.lwd.show = FALSE) +
+tm_shape(alternative) +
+  tm_lines(col = "rank", lwd = 2) +
+tm_shape(df_even) +
+  tm_dots(col = "lightblue", size = 2) +
+tm_shape(df_odd) +
+  tm_dots(col = "gold", size = 2) +
+tm_shape(donner_vis) +
+  tm_dots(col = "purple", size = .15) +
+  tm_shape(pts) +
+  tm_dots(col = "red") +
+ tm_layout(frame = FALSE, bg.color = "transparent")
+
+
+tm1 <- tm_shape(surface, bbox = extent2) +
+  tm_polygons(border.col = NULL, col = "art", palette = my_palette, legend.show = F, ) +
+tm_shape(housing, bbox = extent) +
+  tm_polygons(col = "grey25", border.col = "white", lwd = 0.5, alpha = .9) +
+tm_shape(streets, bbox = extent) +
+  tm_lines(lwd = "width", scale = 2.5, legend.lwd.show = FALSE) +
+tm_layout(frame = FALSE) +
+  tm_basemap(server = NULL)
+
+
+tm10 <- tm_shape(streets, bbox = extent2) +
+  tm_lines(lwd = "width", scale = 2.5, legend.lwd.show = FALSE) +
+tm_shape(housing, bbox = extent2) +
+  tm_polygons(col = "grey25", border.col = "white", lwd = 0.5, alpha = .9) +
+  tm_layout(frame = FALSE)
+
+tmap_save(tm10, "presentation/overview_routing.png", width =300, height = 150, dpi = 1000, units = "mm")
+
+
+tm11 <- tm_shape(donner_vis, bbox = extent2) +
+  tm_symbols(size = 0.5, col = "red",  alpha = 0.6, border.col = "NA") +
+  tm_layout(frame = FALSE, bg.color = "transparent") 
+
+tmap_save(tm11, "presentation/donner_routing.png", width =300, height = 150, dpi = 1000, units = "mm", bg="transparent")
+
+
+tm12 <-  tm_shape(df_even,  bbox = extent2) +
+  tm_dots(col = "steelblue", size = 2.5, border.col = "NA", alpha = 0.9) +
+tm_shape(df_odd) +
+  tm_dots(col = "gold", size = 2.5, border.col = "NA", alpha = 0.9) +
+  tm_layout(frame = FALSE, bg.color = "transparent") 
+
+tmap_save(tm12, "presentation/start_end_routing.png", width =300, height = 150, dpi = 1000, units = "mm", bg="transparent")
+
+
+my_palette <- c("#11E2A1", "#9E1FA2")
+
+tm13 <-  tm_shape(df_even,  bbox = extent2) +
+  tm_dots(col = "steelblue", size = 2.5, border.col = "NA", alpha = 0.9) +
+tm_shape(df_odd) +
+  tm_dots(col = "gold", size = 2.5, border.col = "NA", alpha = 0.9) +
+tm_shape(alternative) +
+  tm_lines(col = "rank", lwd = 5, palette = my_palette, border.col = "NA", legend.col.show = F) +
+
+  tm_layout(frame = FALSE, bg.color = "transparent") 
+
+tmap_save(tm13, "presentation/alternative_routing.png", width =300, height = 150, dpi = 1000, units = "mm", bg="transparent")
+
+
+
+??hereR
+
+tmap_mode("plot")
+tm_shape(streets, bbox = donner_vis) +
+  tm_lines(lwd = "width", scale = 1.5, legend.lwd.show = FALSE) +
+tm_shape(alternative) +
+  tm_lines(col = "rank", lwd = 2) +
+tm_shape(df_even) +
+  tm_dots(col = "lightblue", size = 2) +
+tm_shape(df_odd) +
+  tm_dots(col = "gold", size = 2) +
+tm_shape(donner_vis) +
+  tm_dots(col = "purple", size = .15) 
+
+```
 
 # Challenges
 
-1. Loosing all information using spatial tools like st_cast, interpolating etc... we loose our information stored in different columns and only get back a point geometry...
+1.  Loosing all information using spatial tools like st_cast, interpolating etc... we loose our information stored in different columns and only get back a point geometry...
 
-2. Comparing time differences between pairs of last/first segment points in tunnel buffer...
+2.  Comparing time differences between pairs of last/first segment points in tunnel buffer...
 
-3. Map matching only on roads that we care about
+3.  Map matching only on roads that we care about
 
-4. Do we work with points, line segments, nodes? How do we summarize for example slope on a given road? 
+4.  Do we work with points, line segments, nodes? How do we summarize for example slope on a given road?
