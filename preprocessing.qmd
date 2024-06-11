@@ -36,48 +36,12 @@ editor: visual
 # p_install("httr", force = TRUE)
 # p_install("mapmatchr", force = TRUE)
 # p_install("hereR", force = TRUE)
+# p_install("geojson", force = FALSE)
 # p_install("sp", force = TRUE)
 ```
 
-<<<<<<< HEAD
-# Load packages
-=======
-install.packages("pacman")
-library("pacman")
 
-p_install("dplyr", force = FALSE)
-p_install("ggplot2", force = FALSE)
-p_install("readr", force = FALSE)
-p_install("tidyr", force = FALSE)
-p_install("sf", force = FALSE)
-p_install("sp", force = FALSE)
-p_install("terra", force = FALSE)
-p_install("tmap", force = FALSE)
-p_install("zoo", force = FALSE)
-p_install("units", force = FALSE)
-p_install("plotly", force = FALSE)
-p_install("patchwork", force = FALSE)
-p_install("tidyverse", force = FALSE)
-p_install("rjson", force = FALSE)
-p_install("jsonlite", force = FALSE)
-p_install("leaflet", force = TRUE)
-p_install("shiny", force = TRUE)
-p_install("XML", force = TRUE)
-p_install("lubridate", force = TRUE)
-p_install("ggh4x", force = TRUE)
-p_install("forcats", force = TRUE)
-p_install("purrr", force = TRUE)
-p_install("viridis", force = TRUE)
-p_install("osrm", force = TRUE)
-p_install("httr", force = TRUE)
-p_install("mapmatchr", force = TRUE)
-p_install("hereR", force = TRUE)
-p_install("sp", force = TRUE)
-<<<<<<< HEAD
-p_install("geojson", force = FALSE)
-=======
->>>>>>> 5b1ca80874327107baf1a566403d915d7d95b228
->>>>>>> 7acf02fbf5e47ae1f8bb1f8953c6c4640560ff8e
+
 
 ```{r}
 library("ggh4x")
@@ -106,21 +70,12 @@ library("osrm")
 library("httr")
 library("mapmatchr")
 library("geojsonsf")
-
-#<<<<<<< HEAD
 library("here")
 library("sp")
-#=======
 library("hereR")
-<<<<<<< HEAD
-#>>>>>>> f08770080dcba2ba396927d0228eb68552f0b88e
-=======
-<<<<<<< HEAD
-=======
->>>>>>> f08770080dcba2ba396927d0228eb68552f0b88e
->>>>>>> 7acf02fbf5e47ae1f8bb1f8953c6c4640560ff8e
 
->>>>>>> 5b1ca80874327107baf1a566403d915d7d95b228
+#>>>>>>> f08770080dcba2ba396927d0228eb68552f0b88e
+
 ```
 
 # Task 1: Import Express: Bringing GPS Data Onboard
@@ -707,7 +662,7 @@ traj <- all_routes_seg_tunnel_cor |>
   #tm_shape(streets) +
   #tm_lines()
 
-traj2 <- st_buffer(taj, 0.25)
+traj2 <- st_buffer(traj, 0.25)
 
 traj_width <- st_join(traj2, streets, left = TRUE, suffix = "street", join = st_intersects)
 
@@ -777,8 +732,7 @@ width_preference <- traj_enriched_final %>%
     perc = (sum / tot) * 100,
     pref = perc - 16.67
   )
-ungroup()
-summarise(pref)
+
 
 
 
