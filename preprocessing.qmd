@@ -385,28 +385,6 @@ ggplot(raeubertochter_cor,aes(x, y, color = segment_id_cor)) +
     labs(title = "Deliveries", subtitle="Segmentation set at time_difference > 10s \nSegments < 120s removed \nTunnel Challenge incl.")  
   
 
-#################################################################################
-
-
-## Interpolating!!! Should be done before merging the two objects. maybe it's better to interpolate based on the data frame matched_segments and then repeat the segmentation... cleaner version??
-
-
-line <- st_cast(st_combine(matched_segments$geometry), "LINESTRING")
-
-# Interpolate points along the line
-interpolated_pts <- st_segmentize(line, units::set_units(5, "m"))
-
-plot(interpolated_pts)
-?st_cast
-
-?st_segmentize
-
-
-#################################################################################
-
-
-
-
 ```
 
 # Task 4: Import Spatial Data
@@ -660,6 +638,16 @@ tm_shape(alternative$geometry) +
 
 ```
 
+
+# Combinig actual and alternative routes
+
+```{r}
+
+
+
+```
+
+
 # Enrich street network
 
 ```{r}
@@ -844,7 +832,7 @@ summarise(pref)
 
 
 ggplot(width_preference) +
-  geom_boxplot(aes(x = width, y = perc))
+  geom_boxplot(aes(x = width, y = perc, fill = messenger))
 
 
 ggplot(width_preference_alt) +
