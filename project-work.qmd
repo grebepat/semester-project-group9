@@ -1,0 +1,186 @@
+---
+title: "semester-project-group9"
+format: html
+editor: visual
+---
+
+## Abstract
+
+This project explores the possibility of determine the perception of route choice of bike messengers in the city of Zurich. This is done by comparing choosen trajectories with auto generated alternative trajectories. We compare the paths of chosen routes (deliveries) with a
+the generated set of modeled routes (choice-set/alternatives) in terms of distance traveled, maximum slope and street type. Our analysis based on xxx shift performed by 4 messengers. Street network and attributes are taken from the Swisstlm3d data set. Which allows to add attributes such as traveled distance, slope, traffic volumes, street type and width, and the number of intersections.
+
+## Research Questions
+
+1.  Do bike messengers always choose the shortest possible route during their deliveries? -\> Efficiency in terms of travel distance
+
+2.  How do street network attributes influence the route choice behaviour of bike messengers in Zurich? -\> Efficiency in terms of an optimised cost-path ratio
+
+3.  Is there a combination of above criteria that would be preferable in terms of speed/convenience?
+
+## Introduction
+
+Route choice models play an important role in many transport applications, for example, intelligent transport systems, GPS navigation and transportation planning (Freijnger).
+Modeling route choice behavior is essential, given the possibility to appraise travelers perceptions of route characteristicsa and to forecast travelers’ behavior under hypothetical scenarios (Prato). Route choice models can assess travelers’ perceptions of various route characteristics such as distance, travel time, cost, number of traffic lights and road types, and relate the results to the individuals’ characteristics (e.g. gender, age, income and trip purpose). Route choice models not only help analyzing and understanding travelers’ behavior, but also constitute the essential part of traffic assignment methods. In the deterministic user equilibrium (DUE) problem, a simple route choice model assumes. Several studies have used route choice modelling to investigate preferences of cyclists in cities for different purposes such as effectiveness of investments in bicycle infrastructure (hood, peterson). This work takes a different approach by exploring route choices of bike messengers. Analyzing the route choices of bike messengers compared to ordinary cyclists can provide insights into efficiency and safety. Due to the fact that bike messengers, are often under time pressure and have a excellent knowledge of the street network, they may choose faster routes, even if they are longer in terms of distance.  Additionally, as experienced cyclists, bike messengers may opt for safer routes or those with less traffic, contributing to the overall safety of all cyclists.
+Furthermore, routes chosen by bike messengers can offer important data on the usage of the city’s cycling infrastructure. This can guide decisions on where to focus improvements and enhance route planning and traffic management.
+
+## Data
+
+### GPS Data
+
+We utilized GPS data collected with the fitness-tracking-app Strava. the data was collected by several bike messengers in Zurich. The data was conducted as GPX files. The data encompasses approximately 60 shifts per messenger, with each shift including multiple trajectories/deliveries. The shifts vary in terms of distance traveled, working hours, and the number of deliveries. 
+
+### Street Data
+All contextual data for enriching the route network is sourced from open-source platforms. We used the following datasets for our street data analysis:
+
+SwissTLM3D: Provided the street network, street type, and width.
+SwissALTI3D: Used for obtaining the slope of the streets.
+Motorized Individual Traffic Volume Data: Offered insights into the traffic volume.
+OpenStreetMap (OSM): Used for data on traffic lights and intersections/junctions.
+
+### Results of the map matching
+
+### Stop detection
+
+# Task 3: From Dots to Drops: Segmenting GPS Fixes into Deliveries
+
+```{r}
+# Apply same segmentation method for all messengers
+
+# create a moving time window
+all_routes_seg <- all_routes |> 
+   group_by(id) |> 
+   mutate(
+        nMinus2 = difftime(time, lag(time, 2)), 
+        nMinus1 = difftime(time, lag(time,1)),  
+        nPlus1  = difftime(lead(time, 1), time), 
+        nPlus2  = difftime(lead(time, 2), time)  
+    )
+
+# calculate row wise mean distance per messenger
+all_routes_seg <- all_routes_seg |> 
+    group_by(id) |>
+    mutate(
+        timeMean = (nMinus2 + nMinus1 + nPlus1 + nPlus2) / 4
+    ) |>
+    ungroup()
+
+# create a new column static, based on time_difference (over 20s time difference)
+all_routes_seg <- all_routes_seg |> 
+  mutate(new_segment = timeMean > 20)
+
+# it assigns unique IDs based on the column static
+rle_id <- function(vec) {
+    x <- rle(vec)$lengths
+    as.factor(rep(seq_along(x), times = x))
+}
+
+# removes static rows
+all_routes_seg <- all_routes_seg |>
+    mutate(temp_id = rle_id(new_segment)) |> 
+    filter(!new_segment)
+
+# remove segments shorter than two minuntes
+all_routes_seg <- all_routes_seg |> 
+  group_by(temp_id) |> 
+  mutate(duration = difftime(max(time), min(time))
+  ) |> 
+  filter(!duration < 120) |> 
+  ungroup()
+
+# Adssing new segment_id starting at one, credits to: https://stackoverflow.com/questions/39650511/r-group-by-variable-and-then-assign-a-unique-id
+all_routes_seg <- all_routes_seg |> 
+  group_by(temp_id, messenger) |> 
+  mutate(segment_id = as_factor(cur_group_id())) |> 
+  ungroup() |> 
+  select(-temp_id)
+
+all_routes_seg |> 
+  group_by(messenger) |> 
+  summarise(length(unique(segment_id)))
+
+
+raeubertochter_seg <- filter(all_routes_seg, messenger == "raeubertochter")
+
+donner_seg <- filter(all_routes_seg, messenger == "donner")
+```
+
+```{r}
+# visualize segments
+
+# all segments
+p1 <- ggplot(all_routes_seg,aes(x, y, color = segment_id)) +
+    scale_fill_brewer(palette = "Set3") +
+    geom_point() +
+    coord_fixed() +
+    theme_minimal() +
+    theme(legend.position = "none")+
+    labs(title = "Deliveries", subtitle="Segmentation set at time_difference > 10s \nSegments < 60s removed") 
+
+# donner segments
+p2 <- ggplot(donner_seg, aes(x, y, color = segment_id)) +
+    geom_path() +
+    geom_point() +
+    scale_fill_brewer(palette = "Set1") +
+    coord_fixed() +
+    theme(legend.position = "none")+
+    labs(title = "Deliveries", subtitle="Segmentation set at time_difference > 10s \nSegments < 120s removed")  
+
+# rauebertochter segments
+p3 <- ggplot(raeubertochter_seg, aes(x, y, color = segment_id)) +
+    geom_path() +
+    geom_point() +
+    scale_fill_brewer(palette = "Set1") +
+    coord_fixed() +
+    theme(legend.position = "none")+
+    labs(title = "Deliveries", subtitle="Segmentation set at time_difference > 10s \nSegments < 120s removed")
+
+ggarrange(p2, p3)
+```
+
+## Generation of choice sets
+
+The alternative (non-chosen) routes for the origin–destination pairs were generated using the hereR package
+
+### Additional route characteristics
+In order to characterize the route and the trade-offs of the cyclists further route characteristics were calculated. It was not possible to add average or even time-specific traffic volumes.
+
+## Descriptive Analysis
+
+## Model estimation
+
+
+
+
+
+
+
+
+## Results / products
+
+We anticipate that the observed route choices will align only partially with the shortest possible routes. Instead, the chosen routes are likely influenced by factors such as road type and slope. We assume a trade-off between the most direct path and resistance/convenience, with bike messengers leveraging their knowledge of the local street network to optimize this balance/trade-off.
+
+
+
+## Analytical concepts
+
+1.  **Segmentation:** Split the raw data to isolate individual deliveries, generating single-way trajectories for each delivery.
+2.  **Map Matching:** Perform map matching of the messenger data to extract start and end points of each trajectory.
+3.  **Route Modeling:** Model alternative routes using the start and end points of segmented trajectories.
+4.  **Comparison:** Compare the modeled trajectories with the actual trajectories in terms of the shortest path.
+5.  **Enhanced Analysis:** Repeat the analysis with an enriched street network that includes resistance attributes.
+
+## R concepts
+
+For modeling alternative trajectories, we will use the HERE REST API via the R package `HereR`. Additionally, we may consider using the BFSLE algorithm as discussed in recent literature (see here: <https://doi.org/10.1016/j.tra.2023.103723>).
+
+## Risk analysis
+
+The primary challenge is the implementation of resistance factors. The multitude of attributes influencing cost-path networks or personal route choices makes meaningful integration complex. Addressing and incorporating these attributes effectively will be a significant challenge.
+
+## Questions?
+
+1.  Should we combine the street network attributes into a single resistance attribute, or should we keep them separate to identify which attributes significantly influence route choice?
+2.  Is this project feasible given the limited time and resources?
+3.  Other ideas for this data?
+4. Rauf / Runter Fahren? Unterschiedliche Routenwahl bez. Geschwindigkeit
+5. Mit Datenmengen umgehen, gerade gpkg von swisstopo sehr gross, selbst wenn zugeschnitten

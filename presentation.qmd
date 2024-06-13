@@ -4,7 +4,6 @@ format: html
 editor: visual
 ---
 
-
 ```{r}
 
 
@@ -118,7 +117,7 @@ tm_shape(streets, bbox = extent) +
 tm_layout(frame = FALSE) +
   tm_basemap(server = NULL)
 
-tmap_save(tm1, "presentation/overview.png", width = 250, height = 200, dpi = 1000, units = "mm")
+# tmap_save(tm1, "presentation/overview.png", width = 250, height = 200, dpi = 1000, units = "mm")
 
 
 
@@ -362,5 +361,3 @@ tmap_save(tm_13, "presentation/map_matching.png", width = 250, height = 200, dpi
 
 
 ```
-
-

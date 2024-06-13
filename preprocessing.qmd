@@ -10,6 +10,7 @@ editor: visual
 install.packages("pacman")
 library("pacman")
 
+
 p_install("dplyr", force = FALSE)
 p_install("ggplot2", force = FALSE)
 p_install("readr", force = FALSE)
@@ -39,46 +40,10 @@ p_install("hereR", force = FALSE)
 p_install("geojson", force = FALSE)
 p_install("sp", force = FALSE)
 p_install("osmdata", force = FALSE)
-```
-
-# Load libraries
-
-```{r}
-
-library("ggh4x")
-library("dplyr")
-library("ggplot2")
-library("tidyr")
-library("sf")
-library("sp")
-library("terra")
-library("tmap")
-library("zoo")
-library("units")
-library("plotly")
-library("patchwork")
-library("tidyverse")
-library("rjson")
-library("jsonlite")
-library("leaflet")
-library("XML")
-library("lubridate")
-library("shiny")
-library("forcats")
-library("purrr")
-library("viridis")
-library("osrm")
-library("httr")
-library("mapmatchr")
-library("geojsonsf")
-library("here")
-library("sp")
-library("hereR")
-library("osmdata")
-
-# API KEY >>>>>>> f08770080dcba2ba396927d0228eb68552f0b88e
+p_install("ggpubr", force = TRUE)
 
 ```
+
 
 # Task 1: Import Express: Bringing GPS Data Onboard
 
@@ -124,6 +89,7 @@ all_routes <- do.call(rbind, single_routes)
 raeubertochter_raw <- filter(all_routes, messenger == "raeubertochter")
 donner_raw <- filter(all_routes, messenger == "donner")
 
+<<<<<<< HEAD
 
 # If filtering certain rides is needed
 # filter only messenger rides. We do this by filtering the routes that have taken place in the city of zurich
@@ -152,6 +118,8 @@ donner_raw <- filter(all_routes, messenger == "donner")
 #   bind_rows(raeubertochter_raw)
 
 
+=======
+>>>>>>> c50551c116e76f6ae0ae8710ecfdb9c816aea5c3
 # Quick overview
 tmap_mode("plot")
 tm_shape(all_routes) +
@@ -159,7 +127,62 @@ tm_shape(all_routes) +
 
 ```
 
-# Task 2: Signal Sync: Assessing Sampling Intervals Across Messenger GPS Systems
+# Task 2: Import Spatial Data
+
+```{r}
+st_layers("gis_files/basic_data.gpkg")
+
+streets <- read_sf("gis_files/basic_data.gpkg", "street_network_z") |> 
+   select(objektart, geom) |> 
+  mutate(
+    objektart = as.factor(objektart),
+    width = as.numeric(substr(objektart, start = 1, stop = 1)),
+    width_scaled = as.numeric(substr(objektart, start = 1, stop = 1)) *1000
+  ) |> 
+  na.omit()
+
+streets <- streets %>%
+  group_by(objektart) %>%
+  summarize(geometry = st_union(geometry), .groups = "drop")
+
+read_sf("")
+  
+
+
+housing <- read_sf("gis_files/basic_data.gpkg", "housing_footprint") |> 
+   select(objektart, geom) |>
+  mutate(
+    objektart = as.factor(objektart)
+  )
+
+
+surface <- read_sf("gis_files/basic_data.gpkg", "surface_type") |> 
+   select(art, geom) |> 
+  mutate(
+    art = as.factor(art)) |> 
+ filter(art == "fliessendes Gewässer" | art == "stehendes Gewässer" | art == "Strasse, Weg" | art == "Verkehrsinsel") |> 
+  na.omit()
+
+summary(surface$art)
+
+
+height <- terra::rast("gis_files/dhm25_zh.tif")
+
+zurich <- st_bbox(c(xmin = 8.387726, ymin = 47.301000, xmax = 8.658916, ymax = 47.462420), crs = st_crs(4326))
+
+# Convert bounding box to a polygon
+zurich <- st_as_sfc(zurich)
+
+# If you need to transform the CRS
+zurich <- st_transform(zurich, crs = 2056)
+
+# intersect the gis information files with the bounding box of zurich
+housing <- st_intersection(housing, zurich)
+streets <- st_intersection(streets, zurich)
+surface <- st_intersection(surface, zurich)
+```
+
+# Task 3: Signal Sync: Assessing Sampling Intervals Across Messenger GPS Systems
 
 ```{r}
 
@@ -186,13 +209,17 @@ all_routes |>
 max(all_routes$time_difference, na.rm = T) / 60
 
 
-ggplot(all_routes, aes(x = time_difference)) +
+p1 <- ggplot(all_routes, aes(x = time_difference)) +
   geom_histogram(binwidth = 2) +
   scale_y_log10() +
   labs(x = "Time Difference in sec.", y = "Count (Log Scale)") +
   ggtitle("Histogram of Time Differences with Log Y Axis") +
   facet_wrap(all_routes$id) +
   theme_minimal()
+
+streets
+
+p1
 
 
 # Both with similar but slightly different sampling regimes, raeubertochter with an intervall of 1 second- It seems that static time is already removed..
@@ -204,7 +231,10 @@ ggplot(all_routes, aes(x = time_difference)) +
 # Task 3: From Dots to Drops: Segmenting GPS Fixes into Deliveries
 
 ```{r}
+<<<<<<< HEAD
 
+=======
+>>>>>>> c50551c116e76f6ae0ae8710ecfdb9c816aea5c3
 # First we try the same segmentation method for all messengers
 
 # create a moving time window
@@ -265,44 +295,15 @@ all_routes_seg <- all_routes_seg |>
   ungroup() |> 
   select(-temp_id)
 
-# visualize segments
-ggplot(all_routes_seg,aes(x, y, color = segment_id)) +
-    scale_fill_brewer(palette = "Set3") +
-    geom_point() +
-    coord_fixed() +
-    theme_minimal() +
-    theme(legend.position = "none")+
-    labs(title = "Deliveries", subtitle="Segmentation set at time_difference > 10s \nSegments < 60s removed") 
-
-
-# It already looks really good????
-
-
+# how many segments have been differentiated?
 all_routes_seg |> 
   group_by(messenger) |> 
   summarise(length(unique(segment_id)))
 
-
+# filter segments according to messenger
 raeubertochter_seg <- filter(all_routes_seg, messenger == "raeubertochter")
 
 donner_seg <- filter(all_routes_seg, messenger == "donner")
-
-
-ggplot(donner_seg, aes(x, y, color = segment_id)) +
-    geom_path() +
-    geom_point() +
-    scale_fill_brewer(palette = "Set1") +
-    coord_fixed() +
-    theme(legend.position = "none")+
-    labs(title = "Deliveries", subtitle="Segmentation set at time_difference > 10s \nSegments < 120s removed")  
-
-ggplot(raeubertochter_seg, aes(x, y, color = segment_id)) +
-    geom_path() +
-    geom_point() +
-    scale_fill_brewer(palette = "Set1") +
-    coord_fixed() +
-    theme(legend.position = "none")+
-    labs(title = "Deliveries", subtitle="Segmentation set at time_difference > 10s \nSegments < 120s removed")  
 
 
 ```
@@ -369,28 +370,30 @@ raeubertochter_cor <- filter(all_routes_seg_tunnel_cor, messenger == "raeubertoc
 
 donner_cor <- filter(all_routes_seg_tunnel_cor, messenger == "donner")
 
-
-ggplot(donner_cor,aes(x, y, color = segment_id_cor)) +
-    geom_path() +
-    geom_point() +
-    scale_fill_brewer(palette = "Set1") +
-    coord_fixed() +
-    theme(legend.position = "none")+
-    labs(title = "Deliveries", subtitle="Segmentation set at time_difference > 10s \nSegments < 120s removed \nTunnel Challenge incl.")  
-
-ggplot(raeubertochter_cor,aes(x, y, color = segment_id_cor)) +
-    geom_path() +
-    geom_point() +
-    scale_fill_brewer(palette = "Set1") +
-    coord_fixed() +
-    theme(legend.position = "none")+
-    labs(title = "Deliveries", subtitle="Segmentation set at time_difference > 10s \nSegments < 120s removed \nTunnel Challenge incl.")  
+# 
+# ggplot(donner_cor,aes(x, y, color = segment_id_cor)) +
+#     geom_path() +
+#     geom_point() +
+#     scale_fill_brewer(palette = "Set1") +
+#     coord_fixed() +
+#     theme(legend.position = "none")+
+#     labs(title = "Deliveries", subtitle="Segmentation set at time_difference > 10s \nSegments < 120s removed \nTunnel Challenge incl.")  
+# 
+# ggplot(raeubertochter_cor,aes(x, y, color = segment_id_cor)) +
+#     geom_path() +
+#     geom_point() +
+#     scale_fill_brewer(palette = "Set1") +
+#     coord_fixed() +
+#     theme(legend.position = "none")+
+#     labs(title = "Deliveries", subtitle="Segmentation set at time_difference > 10s \nSegments < 120s removed \nTunnel Challenge incl.")  
   
 
 ```
 
+
 # Task 5: Map Matching
 # Task 5.1: Import Spatial Data
+
 
 ```{r}
 
@@ -423,6 +426,7 @@ height <- terra::rast("gis_files/dhm25_zh.tif")
 ```
 
 # Task 5.2: Import Street Network as Edges and Nodes
+
 
 ```{r}
 
@@ -522,8 +526,6 @@ alternative <- alternative |>
   st_zm(drop = TRUE) |> 
   rename(segment_id = id)
 
-tm_shape(alternative) +
-  tm_dots(col = "segment_id")
 
 # Visualisation for the presentation
 # extent2 <- st_transform(st_buffer(alternative, 200), crs = 2056)
@@ -540,7 +542,35 @@ tm_shape(alternative) +
 # 
 # streets <- st_intersection(streets, extent2)
 # housing <- st_intersection(housing, extent2)
-# 
+
+
+alternative <- st_transform(alternative, crs = 2056)
+
+alternative <- st_cast(alternative, "POINT")
+alternative <- st_zm(alternative, drop = TRUE)
+
+
+donner_vis <- donner_cor |> 
+  filter(segment_id_cor == 1)
+
+
+
+extent2 <- st_transform(st_buffer(alternative, 200), crs = 2056)
+st_bbox(extent2)
+
+coords <- rbind(c(2679514  , 1249013 ), c(2683075, 1249013 ), c(2683075, 1247635), c(2679514 , 1247635), c(2679514 , 1249013 ))
+
+# Create a polygon
+polygon <- st_polygon(list(coords))
+
+# Convert to spatial object
+extent2 <- st_sfc(polygon, crs = 2056)
+
+
+streets <- st_intersection(streets, extent2)
+housing <- st_intersection(housing, extent2)
+
+####>>>>>>> c50551c116e76f6ae0ae8710ecfdb9c816aea5c3
 # tmap_mode("view")
 # tm_shape(streets, bbox = extent2) +
 #   tm_lines(lwd = "width", scale = 1.5, legend.lwd.show = FALSE) +
@@ -620,6 +650,7 @@ tm_shape(alternative) +
 #   tm_dots(col = "gold", size = 2) +
 # tm_shape(donner_vis) +
 #   tm_dots(col = "purple", size = .15) 
+
 
 ```
 
@@ -709,6 +740,7 @@ st_geometry(combined) <- st_geometry(near_to)
 tmap_mode("view")
 
 
+
 tm_shape(street_network) + 
   tm_lines() +
 tm_shape(nearest) + 
@@ -717,6 +749,24 @@ tm_shape(combined) +
   tm_dots(col = "messenger") + 
 tm_shape(near_to) + 
   tm_dots(col = "lightblue")
+
+# tm_shape(street_network) + 
+#   tm_lines() +
+# tm_shape(nearest_route) + 
+#   tm_lines(lty = 3) +
+# tm_shape(all_routes_seg_tunnel_cor$geometry) + 
+#   tm_dots(col = "purple") + 
+# tm_shape(near_to_route) + 
+#   tm_dots(col = "lightblue")
+# 
+# 
+# tm_shape(street_network) + 
+#   tm_lines() +
+# tm_shape(nearest_alternative) + 
+#   tm_lines(lty = 3) +
+# tm_shape(alternative$geometry) + 
+#   tm_dots(col = "purple") 
+
 
 ```
 
