@@ -35,15 +35,56 @@ p_install("purrr", force = FALSE)
 p_install("viridis", force = FALSE)
 p_install("osrm", force = FALSE)
 p_install("httr", force = FALSE)
-p_install("mapmatchr", force = FALSE)
 p_install("hereR", force = FALSE)
 p_install("geojson", force = FALSE)
 p_install("sp", force = FALSE)
 p_install("osmdata", force = FALSE)
 p_install("ggpubr", force = TRUE)
+p_install("gganimate", force = FALSE)
+p_install("magick", force = FALSE)
+p_install("gifski", force = FALSE)
+p_install("png", force = FALSE)
+p_install("grid", force = FALSE)
+p_install("raster", force = FALSE)
+
+library("ggh4x")
+library("dplyr")
+library("ggplot2")
+library("tidyr")
+library("sf")
+library("sp")
+library("terra")
+library("tmap")
+library("zoo")
+library("units")
+library("plotly")
+library("patchwork")
+library("tidyverse")
+library("rjson")
+library("jsonlite")
+library("leaflet")
+library("XML")
+library("lubridate")
+library("shiny")
+library("forcats")
+library("purrr")
+library("viridis")
+library("osrm")
+library("httr")
+library("geojsonsf")
+library("here")
+library("sp")
+library("hereR")
+library("osmdata")
+library("gganimate")
+library("magick")
+library("gifski")
+library("png")
+library("grid")
+
+
 
 ```
-
 
 # Task 1: Import Express: Bringing GPS Data Onboard
 
@@ -89,7 +130,6 @@ all_routes <- do.call(rbind, single_routes)
 raeubertochter_raw <- filter(all_routes, messenger == "raeubertochter")
 donner_raw <- filter(all_routes, messenger == "donner")
 
-<<<<<<< HEAD
 
 # If filtering certain rides is needed
 # filter only messenger rides. We do this by filtering the routes that have taken place in the city of zurich
@@ -118,8 +158,6 @@ donner_raw <- filter(all_routes, messenger == "donner")
 #   bind_rows(raeubertochter_raw)
 
 
-=======
->>>>>>> c50551c116e76f6ae0ae8710ecfdb9c816aea5c3
 # Quick overview
 tmap_mode("plot")
 tm_shape(all_routes) +
@@ -130,6 +168,7 @@ tm_shape(all_routes) +
 # Task 2: Import Spatial Data
 
 ```{r}
+
 st_layers("gis_files/basic_data.gpkg")
 
 streets <- read_sf("gis_files/basic_data.gpkg", "street_network_z") |> 
@@ -141,19 +180,23 @@ streets <- read_sf("gis_files/basic_data.gpkg", "street_network_z") |>
   ) |> 
   na.omit()
 
-streets <- streets %>%
-  group_by(objektart) %>%
-  summarize(geometry = st_union(geometry), .groups = "drop")
+# 
+# streets <- streets %>%
+#   group_by(objektart) %>%
+#   summarize(geometry = st_union(geometry), .groups = "drop")
+# 
 
-read_sf("")
   
-
+outline <- read_sf("gis_files/basic_data.gpkg", "city_outline")
 
 housing <- read_sf("gis_files/basic_data.gpkg", "housing_footprint") |> 
    select(objektart, geom) |>
   mutate(
     objektart = as.factor(objektart)
   )
+
+housing_union <- st_union(housing)
+housing_simpl <- st_simplify(housing_union, dTolerance = 0.001)
 
 
 surface <- read_sf("gis_files/basic_data.gpkg", "surface_type") |> 
@@ -163,23 +206,62 @@ surface <- read_sf("gis_files/basic_data.gpkg", "surface_type") |>
  filter(art == "fliessendes Gewässer" | art == "stehendes Gewässer" | art == "Strasse, Weg" | art == "Verkehrsinsel") |> 
   na.omit()
 
-summary(surface$art)
-
 
 height <- terra::rast("gis_files/dhm25_zh.tif")
 
-zurich <- st_bbox(c(xmin = 8.387726, ymin = 47.301000, xmax = 8.658916, ymax = 47.462420), crs = st_crs(4326))
+# zurich <- st_bbox(c(xmin = 8.387726, ymin = 47.301000, xmax = 8.658916, ymax = 47.462420), crs = st_crs(4326))
+# 
+# # Convert bounding box to a polygon
+# zurich <- st_as_sfc(zurich)
+# 
+# # If you need to transform the CRS
+# zurich <- st_transform(zurich, crs = 2056)
+# 
+# # intersect the gis information files with the bounding box of zurich
+# housing <- st_intersection(housing, zurich)
+# streets <- st_intersection(streets, zurich)
+# surface <- st_intersection(surface, zurich)
 
-# Convert bounding box to a polygon
-zurich <- st_as_sfc(zurich)
+# Extent Raeubertochter
+coords <- rbind(c(2678862, 1246191), c(2684134, 1246191), c(2684134, 1249710), c(2678862, 1249710), c(2678862, 1246191))
 
-# If you need to transform the CRS
-zurich <- st_transform(zurich, crs = 2056)
+# Create a polygon
+polygon <- st_polygon(list(coords))
 
-# intersect the gis information files with the bounding box of zurich
-housing <- st_intersection(housing, zurich)
-streets <- st_intersection(streets, zurich)
-surface <- st_intersection(surface, zurich)
+# Convert to spatial object
+extent_raeubertochter <- st_sfc(polygon, crs = 2056)
+
+
+housing_raeubertochter <- st_intersection(housing, extent_raeubertochter)
+streets_raeubertochter <- st_intersection(streets, extent_raeubertochter)
+surface_raeubertochter <- st_intersection(surface, extent_raeubertochter)
+
+
+
+tm1 <- tm_shape(streets_raeubertochter, bbox = extent_raeubertochter) +
+  tm_lines(lwd = "width", scale = 2.5, legend.lwd.show = FALSE) +
+tm_shape(housing_raeubertochter, bbox = extent_raeubertochter) +
+  tm_polygons(col = "grey25", border.col = "white", lwd = 0.5, alpha = .9) +
+tm_shape(raeubertochter_raw, bbox = extent_raeubertochter) +
+  tm_symbols(size = 0.6, col = "red",  alpha = 0.7, border.col = "NA") +
+  tm_layout(frame = FALSE) 
+
+tmap_save(tm1, "raeubertochter_raw.png", width = 800, height = 600, dpi = 800, units = "mm")
+
+
+box2 <- st_bbox(donner_raw)
+
+tm3 <- tm_shape(streets, bbox = box2) +
+  tm_lines(lwd = "width", scale = 2.5, legend.lwd.show = FALSE) +
+tm_shape(housing, bbox = box2) +
+  tm_polygons(col = "grey25", border.col = "white", lwd = 0.5, alpha = .9) +
+tm_shape(donner_raw, bbox = box2) +
+  tm_symbols(size = 0.6, col = "red",  alpha = 0.7, border.col = "NA") +
+  tm_layout(frame = FALSE) 
+
+tmap_save(tm3, "raeubertochter_raw.png", width = 800, height = 600, dpi = 800, units = "mm")
+
+
 ```
 
 # Task 3: Signal Sync: Assessing Sampling Intervals Across Messenger GPS Systems
@@ -209,7 +291,7 @@ all_routes |>
 max(all_routes$time_difference, na.rm = T) / 60
 
 
-p1 <- ggplot(all_routes, aes(x = time_difference)) +
+ggplot(all_routes, aes(x = time_difference)) +
   geom_histogram(binwidth = 2) +
   scale_y_log10() +
   labs(x = "Time Difference in sec.", y = "Count (Log Scale)") +
@@ -217,24 +299,19 @@ p1 <- ggplot(all_routes, aes(x = time_difference)) +
   facet_wrap(all_routes$id) +
   theme_minimal()
 
-streets
-
-p1
 
 
 # Both with similar but slightly different sampling regimes, raeubertochter with an intervall of 1 second- It seems that static time is already removed..
 
 # Donner with more variation between fixes, but still short intervals, might need another segmentation...
 
+
 ```
 
-# Task 3: From Dots to Drops: Segmenting GPS Fixes into Deliveries
+# Task 4: From Dots to Drops: Segmenting GPS Fixes into Deliveries
 
 ```{r}
-<<<<<<< HEAD
 
-=======
->>>>>>> c50551c116e76f6ae0ae8710ecfdb9c816aea5c3
 # First we try the same segmentation method for all messengers
 
 # create a moving time window
@@ -302,13 +379,37 @@ all_routes_seg |>
 
 # filter segments according to messenger
 raeubertochter_seg <- filter(all_routes_seg, messenger == "raeubertochter")
-
 donner_seg <- filter(all_routes_seg, messenger == "donner")
 
 
+box3 <- st_bbox(raeubertochter_seg)
+
+tm3 <- tm_shape(streets, bbox = box3) +
+  tm_lines(lwd = "width", scale = 2.5, legend.lwd.show = FALSE) +
+tm_shape(housing, bbox = box3) +
+  tm_polygons(col = "grey25", border.col = "white", lwd = 0.5, alpha = .9) +
+tm_shape(raeubertochter_seg, bbox = box3) +
+  tm_symbols(size = 0.6, col = "red",  alpha = 0.7, border.col = "NA") +
+  tm_layout(frame = FALSE) 
+
+tmap_save(tm3, "raeubertochter_seg.png", width = 250, height = 200, dpi = 1000, units = "mm")
+
+
+box4 <- st_bbox(donner_seg)
+
+tm4 <- tm_shape(streets, bbox = box4) +
+  tm_lines(lwd = "width", scale = 2.5, legend.lwd.show = FALSE) +
+tm_shape(housing, bbox = box4) +
+  tm_polygons(col = "grey25", border.col = "white", lwd = 0.5, alpha = .9) +
+tm_shape(donner_seg, bbox = box4) +
+  tm_symbols(size = 0.6, col = "red",  alpha = 0.7, border.col = "NA") +
+  tm_layout(frame = FALSE) 
+
+tmap_save(tm4, "donner_seg.png", width = 250, height = 200, dpi = 1000, units = "mm")
+
 ```
 
-# Task 4: Lost in Transit: Tackling Tunnel GPS Blackouts for Bike Messenger
+# Task 5: Lost in Transit: Tackling Tunnel GPS Blackouts for Bike Messenger
 
 ```{r}
 
@@ -390,98 +491,6 @@ donner_cor <- filter(all_routes_seg_tunnel_cor, messenger == "donner")
 
 ```
 
-
-# Task 5: Map Matching
-# Task 5.1: Import Spatial Data
-
-
-```{r}
-
-streets <- read_sf("gis_files/basic_data.gpkg", "street_network", promote_to_multi = FALSE) |> 
-   select(objektart, geom) |> 
-  mutate(
-    objektart = as.factor(objektart),
-    width = as.numeric(substr(objektart, start = 1, stop = 1))
-  ) |> 
-  na.omit()
-  
-
-housing <- read_sf("gis_files/basic_data.gpkg", "housing_footprint") |> 
-   select(objektart, geom) |> 
-  mutate(
-    objektart = as.factor(objektart)
-  )
-
-
-surface <- read_sf("gis_files/basic_data.gpkg", "surface_type") |> 
-   select(art, geom) |> 
-  mutate(
-    art = as.factor(art)) |> 
- filter(art == "fliessendes Gewässer" | art == "stehendes Gewässer" | art == "Strasse, Weg" | art == "Verkehrsinsel") |> 
-  na.omit()
-
-
-height <- terra::rast("gis_files/dhm25_zh.tif")
-
-```
-
-# Task 5.2: Import Street Network as Edges and Nodes
-
-
-```{r}
-
-# We could import the street network in form of nodes and edges, credits go to: https://r-spatial.org/r/2019/09/26/spatial-networks.html
-edges <- streets |> 
-  mutate(edgeID = c(1:n()))
-
-edges <- st_zm(edges, drop = TRUE)
-
-edges <- st_cast(edges, "LINESTRING")
-
-
-nodes <- edges %>%
-  st_coordinates() %>% 
-  as_tibble() %>%
-  rename(edgeID = L1) %>% 
-  group_by(edgeID) %>%
-  slice(c(1, n())) %>% 
-  ungroup() %>% 
-  mutate(start_end = rep(c('start', 'end'), times = n()/2))
-
-nodes <- nodes %>%
-  mutate(xy = paste(.$X, .$Y)) %>% 
-  mutate(nodeID = group_indices(., factor(xy, levels = unique(xy)))) %>%
-  select(-xy)
-
-nodes
-
-source_nodes <- nodes |> 
-  filter(start_end == 'start') |> 
-  pull(nodeID)
-
-target_nodes <- nodes |> 
-  filter(start_end == 'end') |> 
-  pull(nodeID)
-
-edges = edges |> 
-  mutate(from = source_nodes, to = target_nodes)
-
-nodes <- nodes |> 
-  distinct(nodeID, .keep_all = TRUE) |> 
-  select(-c(edgeID, start_end)) |> 
-  st_as_sf(coords = c('X', 'Y')) |> 
-  st_set_crs(st_crs(edges))
-
-tmap_mode("view")
-tm_shape(edges) + 
-  tm_lines() +
-  tm_shape(nodes) +
-  tm_dots()
-
-
-
-```
-
 # Task 6: Creating alternative trajectories with hereR:route()
 
 ```{r}
@@ -511,6 +520,8 @@ df_even <- a_to_b[seq(2, nrow(a_to_b), by = 2), ]
 
 # Create a dataframe with odd rows
 df_odd <- a_to_b[seq(1, nrow(a_to_b), by = 2), ]
+
+
 
 
 # if a single smaple is needed
@@ -550,25 +561,25 @@ alternative <- st_cast(alternative, "POINT")
 alternative <- st_zm(alternative, drop = TRUE)
 
 
-donner_vis <- donner_cor |> 
-  filter(segment_id_cor == 1)
-
-
-
-extent2 <- st_transform(st_buffer(alternative, 200), crs = 2056)
-st_bbox(extent2)
-
-coords <- rbind(c(2679514  , 1249013 ), c(2683075, 1249013 ), c(2683075, 1247635), c(2679514 , 1247635), c(2679514 , 1249013 ))
-
-# Create a polygon
-polygon <- st_polygon(list(coords))
-
-# Convert to spatial object
-extent2 <- st_sfc(polygon, crs = 2056)
-
-
-streets <- st_intersection(streets, extent2)
-housing <- st_intersection(housing, extent2)
+# donner_vis <- donner_cor |> 
+#   filter(segment_id_cor == 1)
+# 
+# 
+# 
+# extent2 <- st_transform(st_buffer(alternative, 200), crs = 2056)
+# st_bbox(extent2)
+# 
+# coords <- rbind(c(2679514  , 1249013 ), c(2683075, 1249013 ), c(2683075, 1247635), c(2679514 , 1247635), c(2679514 , 1249013 ))
+# 
+# # Create a polygon
+# polygon <- st_polygon(list(coords))
+# 
+# # Convert to spatial object
+# extent2 <- st_sfc(polygon, crs = 2056)
+# 
+# 
+# streets <- st_intersection(streets, extent2)
+# housing <- st_intersection(housing, extent2)
 
 ####>>>>>>> c50551c116e76f6ae0ae8710ecfdb9c816aea5c3
 # tmap_mode("view")
@@ -657,6 +668,7 @@ housing <- st_intersection(housing, extent2)
 # Task 7: Combining Trajectories and Alternatives into a singel Data Frame
 
 ```{r}
+
 # simplify original dataframe
 original <- all_routes_seg_tunnel_cor |> 
   select(messenger, time, geometry, segment_id_cor) |> 
@@ -688,7 +700,6 @@ combined <- combined |>
 
 
 ```
-
 
 # Task 8: Map Matching
 
@@ -819,9 +830,12 @@ df_sf <- st_as_sf(df_points)
 # Use st_cast to convert multipoint to single point
 df_single_points <- st_cast(df_sf, "POINT")
 
+df_single_points <- st_set_crs(df_single_points, 2056)
 df_single_points <- st_transform(df_single_points, crs = 2056)
 
 df_single_points
+
+
 
 tmap_mode("view")
 tm_shape(df_single_points) +
@@ -831,8 +845,7 @@ tm_shape(df_single_points) +
 
 ```
 
-
-# Task 9: Enrich  network
+# Task 9: Enrich network
 
 ```{r}
 # Enrich combined dataset with street and environmental data
@@ -878,9 +891,6 @@ traj_width$slope <- round(extracted_slope$slope,2)
 traj_enriched <- traj_width |> 
   select(-objektart)
 
-traj_enriched <- traj_enriched |> 
-  select(-time)
-
 
 # Calculations between a pair of points
 
@@ -894,7 +904,7 @@ traj_enriched_final <- traj_enriched |>
          height_diff = c(0, diff(height)),
          tot_height_up = sum(ifelse(height_diff > 0, height_diff, 0)),
          tot_height_down = sum(ifelse(height_diff < 0, height_diff, 0)),
-         slope_calc = ifelse(travel_dist != 0, atan(height_diff / travel_dist), 0)
+         slope_calc = ifelse(travel_dist != 0, (height_diff / travel_dist)*100, 0)
          ) 
   na.omit()
 
@@ -912,28 +922,36 @@ mutate(
  )
 
 
+traj_enriched_final <- traj_enriched_final |> 
+  mutate(
+    type = as.factor(type),
+    segment_id = as.factor(segment_id),
+    index = as.factor(index),
+    width = as.factor(width)
+  )
 
 traj_enriched_final <- traj_enriched_final |> 
-  arrange(type, messenger, segment_id, index) |> 
-  group_by(type, messenger, segment_id, index) |> 
-  mutate(
-    tot_up_100 = sum(ifelse(height_diff > 0, height_diff, 0)),
-    mean_up_100 = mean(ifelse(height_diff > 0, height_diff, 0)),
-    max_up_100 = max(ifelse(height_diff > 0, height_diff, 0)),
-    tot_down_100 = sum(ifelse(height_diff < 0, height_diff, 0)),
-    mean_down_100 = mean(ifelse(height_diff < 0, height_diff, 0)),
-    max_down_100 = min(ifelse(height_diff < 0, height_diff, 0)),
-    tot_slope_up_100 = sum(ifelse(slope_calc > 0, slope_calc, 0)),
-    mean_slope_up_100 = mean(ifelse(slope_calc > 0, slope_calc, 0)),
-    max_slope_up_100 = max(ifelse(slope_calc > 0, slope_calc, 0)),
-    tot_slope_down_100 = sum(ifelse(slope_calc < 0, slope_calc, 0)),
-    mean_slope_down_100 = mean(ifelse(slope_calc < 0, slope_calc, 0)),
-    max_slope_down_100 = min(ifelse(slope_calc < 0, slope_calc, 0)),
+group_by(type, messenger, segment_id, index) |> 
+mutate(
+   height_diff_100 = last(height) - first(height)
     )
-  
+ 
+
+str(traj_enriched_final)
+    
+alternative_final <- traj_enriched_final |> 
+      filter(type == "alternative")
     
     
+original_final <- traj_enriched_final |> 
+      filter(type == "original")
     
+    
+
+
+
+
+
     
   #   mean_slope_100 = dative = cumsum(ifelse(travel_dist > 0, travel_dist, 0)), 
   #        max_slope_100 = 
@@ -1017,27 +1035,12 @@ traj_enriched_final <- traj_enriched_final |>
 # 
 # 
 # 
-# width_preference <- traj_enriched_final %>%
-#   group_by(type, messenger, segment_id, width) %>%
-#   summarise(
-#     sum = sum(travel_dist, na.rm = T)
-#   ) |> 
-#   group_by(messenger) |> 
-#   mutate(
-#     width = as.factor(width),
-#     tot = sum(sum),
-#     perc = (sum / tot) * 100,
-#     pref = perc - 16.67
-#   )
-# 
+
 # 
 # donner <- filter(traj_enriched_final, messenger == "donner")
 # raeubertocher <- filter(traj_enriched_final, messenger == "raeubertochter")
 # 
-# ggplot(width_preference) +
-#   geom_boxplot(aes(x = width, y = perc, fill = messenger)) +
-#    facet_grid(~type)
-# 
+
 # 
 # traj_enriched_final$new_slope <- NA # Create a new column for slopes every 50m
 # 
@@ -1054,7 +1057,118 @@ traj_enriched_final <- traj_enriched_final |>
 
 ```
 
+# Task 10: Results
 
+|                           |       | original |       |       | alternative |       |       |
+|----------------------|---------|:--------|:--------|:--------|:--------|:--------|:--------|
+| variable                  | unit  | min      | mean  | max   | min         | mean  | max   |
+| travel distance           | \[m\] | 549      | 2235  | 4049  | 370         | 2271  | 4099  |
+| average gradient per 100m | \[%\] | -9.67    | 0.05  | 9.32  | -11.7       | 0.03  | 11.4  |
+| max. gradient per 100m    | \[%\] | 0        | 3.75  | 69.35 | 0           | 3.23  | 66.7  |
+| height up                 | \[m\] | 0.68     | 20.6  | 87.7  | 0.78        | 18.5  | 85.6  |
+| height down               | \[m\] | -0.25    | -20.3 | -89.3 | -0.39       | -18.1 | -62.1 |
+
+```{r}
+
+# Descriptive analysis
+traj_enriched_final |> 
+  st_drop_geometry() |> 
+  group_by(type) |> 
+  summarise(Mittelwert = mean(tot_segment_length), Minimum = min(tot_segment_length), Maximum = max(tot_segment_length)
+            , Standardabweichung = sd(tot_segment_length), Bereich = (max(tot_segment_length)-min(tot_segment_length)), median(tot_segment_length))
+
+    
+
+traj_enriched_final |> 
+  st_drop_geometry() |> 
+  group_by(type) |> 
+  summarise(Mittelwert = mean(tot_height_up), Minimum = min(tot_height_up), Maximum = max(tot_height_up)
+            , Standardabweichung = sd(tot_height_up), Bereich = (max(tot_height_up)-min(tot_height_up)), median(tot_height_up))
+
+
+
+
+traj_enriched_final |> 
+  st_drop_geometry() |> 
+  group_by(type) |> 
+  summarise(Mittelwert = mean(tot_height_down), Minimum = min(tot_height_down), Maximum = max(tot_height_down)
+            , Standardabweichung = sd(tot_height_down), Bereich = (max(tot_height_down)-min(tot_height_down)), median(tot_height_down))
+
+
+
+
+# Werte auf 100m Teilstücke zusammengefasst
+
+results <- traj_enriched_final %>%
+  group_by(type, segment_id, index) %>%
+  na.omit() |> 
+  summarise(
+     slope_down = mean(ifelse(slope_calc < 0, slope_calc, 0), na.rm = TRUE),
+     slope_up = mean(ifelse(slope_calc > 0, slope_calc, 0), na.rm = TRUE),
+     max_slope = max((slope_calc), na.rm = TRUE),
+    min_slope = min((slope_calc),na.rm = TRUE),
+    mean_slope = mean((slope_calc), na.rm = TRUE),
+     mean_slope100 = mean((height_diff_100 / 100)) *100
+     # Mean of 'value' column per group
+  )
+
+results |> 
+  st_drop_geometry() |> 
+  group_by(type) |> 
+  summarise(meanMittelwert = mean(mean_slope100), meanMinimum = min(mean_slope100), meanMaximum = max(mean_slope100),
+            meanMax100 = mean(max_slope),
+            maxMax100 = max(max_slope), 
+            minMin = min(max_slope))
+
+
+
+
+
+
+str(alternative_final)
+
+
+
+
+
+
+
+
+
+ boxplot(traj_enriched_final$tot_slope_up_100)   
+    
+    
+    
+ ggplot(traj_enriched_final) +
+   geom_boxplot(aes(type, mean_down_100))
+    
+    
+    
+t.test(original_final$tot_height_up, alternative_final$tot_height_up, paired = T)
+    
+
+
+
+# 
+width_preference <- traj_enriched_final %>%
+  group_by(type, messenger, segment_id, width) %>%
+  summarise(
+    sum = sum(travel_dist, na.rm = T)
+  ) |>
+  group_by(messenger) |>
+  mutate(
+    width = as.factor(width),
+    tot = sum(sum),
+    perc = (sum / tot) * 100,
+    pref = perc - 16.67
+  )
+
+
+ggplot(width_preference) +
+  geom_boxplot(aes(x = width, y = perc, fill = type))
+
+
+```
 
 # Restlicher Chabis
 
@@ -1094,6 +1208,77 @@ tm_shape(pts) +
 tm_shape(alternative) +
   tm_lines(col = "id")
 
+
+
+# 
+# 
+# traj_enriched_final <- traj_enriched |> 
+#   arrange(type, segment_id) |> 
+#   group_by(type, segment_id) |> 
+#   mutate(lead_geom = lead(points),
+#          travel_dist = sqrt(round(ifelse(!is.na(lead_geom), st_distance(lead_geom, points, by_element = TRUE), 0), 1))^2,
+#          dist_cumulative = cumsum(ifelse(travel_dist > 0, travel_dist, 0)), 
+#          tot_segment_length = max(dist_cumulative, na.rm = T),
+#          height_diff = c(0, diff(height)),
+#          tot_height_up = sum(ifelse(height_diff > 0, height_diff, 0)),
+#          tot_height_down = sum(ifelse(height_diff < 0, height_diff, 0)),
+#          slope_calc = ifelse(travel_dist != 0, (height_diff / travel_dist)*100, 0),
+#          tot_slope_up = sum(ifelse(slope_calc > 0, slope_calc, 0), na.rm = T),
+#          tot_slope_down = sum(ifelse(slope_calc < 0, slope_calc, 0), na.rm = T)
+#          ) 
+#   na.omit()
+# 
+# 
+# 
+# 
+#   
+# # Calculation over 100m travel distance
+# # Indexing 100m segments
+#   
+# traj_enriched_final <- traj_enriched_final |> 
+# group_by(type, messenger, segment_id) |> 
+# mutate(
+#     index = as.integer(cumsum(travel_dist) / 100.1 + 1)
+#  )
+# 
+# 
+# 
+# traj_enriched_final <- traj_enriched_final |> 
+#   arrange(type, messenger, segment_id, index) |> 
+#   group_by(type, messenger, segment_id, index) |> 
+#   mutate(
+#     tot_up_100 = sum(ifelse(height_diff > 0, height_diff, 0)),
+#     mean_up_100 = mean(ifelse(height_diff > 0, height_diff, 0)),
+#     max_up_100 = max(ifelse(height_diff > 0, height_diff, 0)),
+#     tot_down_100 = sum(ifelse(height_diff < 0, height_diff, 0)),
+#     mean_down_100 = mean(ifelse(height_diff < 0, height_diff, 0)),
+#     max_down_100 = min(ifelse(height_diff < 0, height_diff, 0)),
+#     tot_slope_up_100 = sum(ifelse(slope_calc > 0, slope_calc, 0), na.rm = T),
+#     mean_slope_up_100 = mean(ifelse(slope_calc > 0, slope_calc, 0), na.rm = T),
+#     max_slope_up_100 = max(ifelse(slope_calc > 0, slope_calc, 0)),
+#     tot_slope_down_100 = sum(ifelse(slope_calc < 0, slope_calc, 0)),
+#     mean_slope_down_100 = mean(ifelse(slope_calc < 0, slope_calc, 0)),
+#     max_slope_down_100 = min(ifelse(slope_calc < 0, slope_calc, 0)),
+#     )
+#   
+# traj_enriched_final <- traj_enriched_final |> 
+#   mutate(
+#     type = as.factor(type),
+#     segment_id = as.factor(segment_id),
+#     index = as.factor(index),
+#     width = as.factor(width)
+#   )
+# 
+# 
+# str(traj_enriched_final)
+#     
+# alternative_final <- traj_enriched_final |> 
+#       filter(type == "alternative")
+#     
+#     
+# original_final <- traj_enriched_final |> 
+#       filter(type == "original")
+
 ```
 
 # Challenges / what to do next time
@@ -1106,4 +1291,4 @@ tm_shape(alternative) +
 
 4.  Do we work with points, line segments, nodes? How do we summarize for example slope on a given road?
 
-5. Interpolating original and alternative routes so we get points every 10 m or so. irregular / regular sampling regime
+5.  Interpolating original and alternative routes so we get points every 10 m or so. irregular / regular sampling regime

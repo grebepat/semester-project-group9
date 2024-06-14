@@ -359,5 +359,60 @@ tm_shape(near_to) +
 tmap_save(tm_13, "presentation/map_matching.png", width = 250, height = 200, dpi = 1000, units = "mm")
 
 
+# simplifiy trajectories
+selected_rows <- raeubertochter_seg[seq(1, nrow(raeubertochter_seg), 3), ]
+
+box <- st_bbox(selected_rows)
+
+
+
+p1 <- ggplot() +
+  geom_sf(data = housing_union, fill = "grey25", color = "grey60", lwd = 0.0001) +
+  scale_x_continuous(limits = c(2678862, 2683984)) +
+  scale_y_continuous(limits = c(1246197, 1249709)) +
+   theme_void() +
+  geom_point(data = selected_rows, aes(x, y, colour = "red")) +
+    theme(legend.position = "none") 
+ 
+
+  
+anim = p1 + transition_time(time) +
+    ease_aes('linear') +
+   shadow_wake(wake_length = 0.5)
+
+
+
+mygif <- animate(anim, width=800, height=800, nframes = 2187, renderer=gifski_renderer(loop=FALSE), rewind = FALSE)  
+anim_save(filename="animation.gif", mygif)
+
+
+
+
+
+
+
+
+tm_shape(housing_union) +
+  tm_polygons(col = "grey25", border.col = "white", lwd = 0.5, alpha = .9) +
+  tm_shape(selected_rows) +
+  tm_dots(size = 0.7, col = "red",  alpha = 0.8, border.col = "NA") +
+  tm_layout(frame = FALSE)
+
+# Create the animation
+tmap_animation(tm, filename = "animation.gif", width = 800, height = 800, delay = 40)
+
+
+
+
+
+
+
+
+
+
+
+
+
+donner_seg <- filter(all_routes_seg, messenger == "donner")
 
 ```

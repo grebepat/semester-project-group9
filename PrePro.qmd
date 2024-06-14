@@ -1,4 +1,3 @@
-
 ---
 title: "preprocessing"
 format: html
@@ -391,6 +390,7 @@ ggplot(raeubertochter_cor,aes(x, y, color = segment_id_cor)) +
 ```
 
 # Task 5: Map Matching
+
 # Task 5.1: Import Spatial Data
 
 ```{r}
@@ -659,7 +659,6 @@ combined <- combined |>
 
 ```
 
-
 # Task 8: Map Matching
 
 ```{r}
@@ -782,8 +781,7 @@ tm_shape(df_single_points) +
 
 ```
 
-
-# Task 9: Enrich  network
+# Task 9: Enrich network
 
 ```{r}
 # Enrich combined dataset with street and environmental data
@@ -1005,8 +1003,6 @@ traj_enriched_final <- traj_enriched_final |>
 
 ```
 
-
-
 # Restlicher Chabis
 
 ```{r}
@@ -1057,4 +1053,4 @@ tm_shape(alternative) +
 
 4.  Do we work with points, line segments, nodes? How do we summarize for example slope on a given road?
 
-5. Interpolating original and alternative routes so we get points every 10 m or so. irregular / regular sampling regime
+5.  Interpolating original and alternative routes so we get points every 10 m or so. irregular / regular sampling regime
