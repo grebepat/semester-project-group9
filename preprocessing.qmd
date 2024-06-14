@@ -176,7 +176,6 @@ streets <- read_sf("gis_files/basic_data.gpkg", "street_network_z") |>
   mutate(
     objektart = as.factor(objektart),
     width = as.numeric(substr(objektart, start = 1, stop = 1)),
-    width_scaled = as.numeric(substr(objektart, start = 1, stop = 1)) *1000
   ) |> 
   na.omit()
 
@@ -677,6 +676,20 @@ original <- all_routes_seg_tunnel_cor |>
     type = as.character("original"),
     segment_id = as.numeric(segment_id)
     )
+
+
+false <- traj_enriched_final |> 
+  filter(segment_id == 57 & type == "original" & travel_dist < 2) 
+
+traj_enriched_final |> 
+  filter(segment_id == 57 & type == "original") |> 
+tm_shape() +
+  tm_dots(col = "travel_dist") +
+tm_shape(false) +
+tm_dots(col = "gold", size = 0.05)
+
+
+
   
 # simplify alternative datast
 alternative <- alternative |> 
@@ -792,8 +805,10 @@ df_lines <- combined %>%
   summarise(geometry = st_combine(geometry)) %>%
   st_cast("LINESTRING")
 
-
-
+df_merged <- combined %>%
+  group_by(type, messenger, segment_id) %>%
+  summarise(geometry = st_union(geometry), do_union = FALSE) %>%
+  st_cast("LINESTRING")
 ##### interpolating
 
 
@@ -809,6 +824,8 @@ interpolate_points <- function(geometry, dist=10) {
 
 
 
+?ceiling
+
 # Apply the function to each LINESTRING
 df_lines$points <- purrr::map(df_lines$geometry, interpolate_points)
 
@@ -818,13 +835,20 @@ df_lines$points <- purrr::map(df_lines$geometry, interpolate_points)
 df_points <- tidyr::unnest(df_lines, points)
 
 
+
 # byebye LINEGEOMETRY
 df_points <- df_points |> 
   st_drop_geometry(geometry)
+
+df_points$x = df_points$points[, 1]
+df_points$y = df_points$points[, 2]
+  
   
 
 # HELLO POINTGEOMETRY
+df_sf <- st_as_sf(df_points, coords = c("x", "y"))
 df_sf <- st_as_sf(df_points)
+
 
 
 # Use st_cast to convert multipoint to single point
@@ -835,11 +859,12 @@ df_single_points <- st_transform(df_single_points, crs = 2056)
 
 df_single_points
 
-
-
 tmap_mode("view")
-tm_shape(df_single_points) +
-  tm_dots(col = "segment_id")
+df_single_points |> 
+  filter(segment_id == 57) |> 
+
+tm_shape() +
+  tm_dots(col = "red")
 
 
 
@@ -889,9 +914,9 @@ traj_width$slope <- round(extracted_slope$slope,2)
 
 # simplify dataframe
 traj_enriched <- traj_width |> 
-  select(-objektart)
+  select(-objektart, -points)
 
-
+str(traj_enriched)
 # Calculations between a pair of points
 
 traj_enriched_final <- traj_enriched |> 
@@ -909,20 +934,69 @@ traj_enriched_final <- traj_enriched |>
   na.omit()
 
 
+# Analysing result
+  
+false <- traj_enriched_final |> 
+  filter(segment_id == 4 & type == "original", travel_dist < 4.01)
+blabla <- traj_enriched_final |> 
+  filter(segment_id == 4 & type == "original", travel_dist > 5) 
+haha <- df_lines |> 
+  filter(segment_id == 4 & type == "original")
+  
+tm_shape(false) +
+tm_dots(col = "gold", size = 0.15)+
+tm_shape(blabla) +
+  tm_dots(col = "travel_dist") +
+  tm_shape(haha) +
+  tm_lines()
 
+
+
+# somehow the interpolation did not work as expected, there are some overlaying points resulting in a travel_dist of 0.. also euclid distance results in travel_dist shorter than 10m because of turning angles..
+
+
+# Cleaning
+
+traj_cleaned <- traj_enriched_final |> 
+  filter(!travel_dist < 4.5) 
+
+  
+# repeat calculations
+
+new <- traj_cleaned |> 
+  arrange(type, segment_id) |> 
+  group_by(type, segment_id) |> 
+  mutate(lead_geom = lead(points),
+         travel_dist = sqrt(round(ifelse(!is.na(lead_geom), st_distance(lead_geom, points, by_element = TRUE), 0), 1))^2,
+         dist_cumulative = cumsum(ifelse(travel_dist > 0, travel_dist, 0)), 
+         tot_segment_length = max(dist_cumulative, na.rm = T),
+         height_diff = c(0, diff(height)),
+         tot_height_up = sum(ifelse(height_diff > 0, height_diff, 0)),
+         tot_height_down = sum(ifelse(height_diff < 0, height_diff, 0)),
+         slope_calc = ifelse(travel_dist != 0, (height_diff / travel_dist)*100, 0)
+         ) |> 
+  na.omit()
+
+
+# setting travel distance to 10m manually, travelled distance was 10m on the line, so euclidiean distance is a little usless
+
+new$travel_dist = 10
 
   
 # Calculation over 100m travel distance
 # Indexing 100m segments
   
-traj_enriched_final <- traj_enriched_final |> 
+  
+
+  
+new <- new |> 
 group_by(type, messenger, segment_id) |> 
 mutate(
     index = as.integer(cumsum(travel_dist) / 100.1 + 1)
  )
 
 
-traj_enriched_final <- traj_enriched_final |> 
+new <- new |> 
   mutate(
     type = as.factor(type),
     segment_id = as.factor(segment_id),
@@ -930,16 +1004,17 @@ traj_enriched_final <- traj_enriched_final |>
     width = as.factor(width)
   )
 
-traj_enriched_final <- traj_enriched_final |> 
+new <- new |> 
 group_by(type, messenger, segment_id, index) |> 
 mutate(
-   height_diff_100 = last(height) - first(height)
+   height_diff_100 = last(height) - first(height),
+   n = n()
     )
  
 
-str(traj_enriched_final)
+str(new)
     
-alternative_final <- traj_enriched_final |> 
+alternative <- new |> 
       filter(type == "alternative")
     
     
@@ -1062,16 +1137,16 @@ original_final <- traj_enriched_final |>
 |                           |       | original |       |       | alternative |       |       |
 |----------------------|---------|:--------|:--------|:--------|:--------|:--------|:--------|
 | variable                  | unit  | min      | mean  | max   | min         | mean  | max   |
-| travel distance           | \[m\] | 549      | 2235  | 4049  | 370         | 2271  | 4099  |
-| average gradient per 100m | \[%\] | -9.67    | 0.05  | 9.32  | -11.7       | 0.03  | 11.4  |
-| max. gradient per 100m    | \[%\] | 0        | 3.75  | 69.35 | 0           | 3.23  | 66.7  |
-| height up                 | \[m\] | 0.68     | 20.6  | 87.7  | 0.78        | 18.5  | 85.6  |
-| height down               | \[m\] | -0.25    | -20.3 | -89.3 | -0.39       | -18.1 | -62.1 |
+| travel distance           | \[m\] | 584      | 2226  | 4039  | 360         | 2305  | 4089  |
+| average gradient per 100m | \[%\] | -8.88    | 0.04  | 11.8  | -11.7       | -0.01  | 9.72  |
+| max. gradient per 100m    | \[%\] | 0        | 4.14  | 75.0 | 0           | 3.37  | 64.7  |
+| height up                 | \[m\] | 0.68     | 20.5  | 87.7  | 0.78        | 17.2  | 83.1  |
+| height down               | \[m\] | -0.25    | -20.2 | -89.3 | -0.39       | -18.4 | -61.9 |
 
 ```{r}
 
 # Descriptive analysis
-traj_enriched_final |> 
+new |> 
   st_drop_geometry() |> 
   group_by(type) |> 
   summarise(Mittelwert = mean(tot_segment_length), Minimum = min(tot_segment_length), Maximum = max(tot_segment_length)
@@ -1079,7 +1154,7 @@ traj_enriched_final |>
 
     
 
-traj_enriched_final |> 
+new |> 
   st_drop_geometry() |> 
   group_by(type) |> 
   summarise(Mittelwert = mean(tot_height_up), Minimum = min(tot_height_up), Maximum = max(tot_height_up)
@@ -1088,7 +1163,7 @@ traj_enriched_final |>
 
 
 
-traj_enriched_final |> 
+new |> 
   st_drop_geometry() |> 
   group_by(type) |> 
   summarise(Mittelwert = mean(tot_height_down), Minimum = min(tot_height_down), Maximum = max(tot_height_down)
@@ -1099,16 +1174,17 @@ traj_enriched_final |>
 
 # Werte auf 100m Teilstücke zusammengefasst
 
-results <- traj_enriched_final %>%
+results <- new %>%
   group_by(type, segment_id, index) %>%
   na.omit() |> 
   summarise(
+    n = n(),
      slope_down = mean(ifelse(slope_calc < 0, slope_calc, 0), na.rm = TRUE),
      slope_up = mean(ifelse(slope_calc > 0, slope_calc, 0), na.rm = TRUE),
      max_slope = max((slope_calc), na.rm = TRUE),
     min_slope = min((slope_calc),na.rm = TRUE),
     mean_slope = mean((slope_calc), na.rm = TRUE),
-     mean_slope100 = mean((height_diff_100 / 100)) *100
+     mean_slope100 = mean((height_diff_100 / (n*10))) *100
      # Mean of 'value' column per group
   )
 
@@ -1123,10 +1199,55 @@ results |>
 
 
 
+# Comparison of length
+length_comp <- new |> 
+  select(type, messenger, segment_id,  tot_segment_length)
 
 
-str(alternative_final)
+df_spread <- length_comp %>%
+  spread(key = type, value = tot_segment_length)
 
+# Compare 'tot_travel' for "original" and "alternative"
+df_spread <- df_spread %>%
+  mutate(is_original_shorter = original < alternative)
+
+
+
+df_spread <- tidyr::spread(length_comp, type, tot_segment_length)
+
+df_spread <- length_comp |> 
+  group_by(type, segment_id) |> 
+  summarise(
+    tot_travel = mean(tot_segment_length)
+  )
+
+comparison <- df_spread %>%
+  group_by(segment_id) %>%
+  summarise(shorter = min(tot_travel[type == "original"]) < min(tot_travel[type == "alternative"]))
+
+shorter_count <- sum(comparison$shorter)
+
+# Calculate the total number of unique 'segment_id's
+total_segments <- nrow(comparison)
+
+# Calculate the percentage
+percentage <- (shorter_count / total_segments) * 100
+
+## original routes were shorter than shortest alternative in 60% of the times
+
+orig = df_spread |> 
+  st_drop_geometry() |> 
+  filter(type == "original")
+
+alt = df_spread |> 
+  st_drop_geometry() |> 
+  filter(type == "alternative")
+
+common_segments <- inner_join(orig, alt, by = "segment_id")
+
+t.test(common_segments$tot_travel.x, common_segments$tot_travel.y, paired = TRUE)
+
+# Unterschiede aber nicht signifikant
 
 
 
@@ -1139,33 +1260,50 @@ str(alternative_final)
     
     
     
- ggplot(traj_enriched_final) +
-   geom_boxplot(aes(type, mean_down_100))
+ ggplot(new) +
+   geom_boxplot(aes(type, tot_segment_length))
+ 
+ 
     
     
-    
-t.test(original_final$tot_height_up, alternative_final$tot_height_up, paired = T)
+ggplot(results, aes(x = max_slope)) +
+  geom_histogram(binwidth = 1) +
+  labs(x = "Time Difference in sec.", y = "Count)") +
+  ggtitle("Histogram of Time Differences with Log Y Axis") +
+  facet_wrap(~type) +
+  theme_minimal()
     
 
 
 
 # 
-width_preference <- traj_enriched_final %>%
+width_preference <- new %>%
   group_by(type, messenger, segment_id, width) %>%
   summarise(
     sum = sum(travel_dist, na.rm = T)
   ) |>
-  group_by(messenger) |>
+  group_by(type, segment_id) |>
   mutate(
     width = as.factor(width),
+    n = n(),
     tot = sum(sum),
     perc = (sum / tot) * 100,
-    pref = perc - 16.67
+    sum_tot = sum(perc),
+    pref = perc - (100/n)
   )
 
+width_preference$width <- factor(width_preference$width, levels = sort(as.numeric(levels(width_preference$width))))
 
 ggplot(width_preference) +
-  geom_boxplot(aes(x = width, y = perc, fill = type))
+  geom_boxplot(aes(x = width, y = pref, fill = type))
+
+
+?geom_bar
+ggplot(width_preference) +
+  geom_bar(aes(x = width, y = pref, fill = type), stat = "identity", position = "dodge") +
+  coord_flip() +
+  theme_minimal() +
+  labs(x = "Width", y = "Preference", fill = "Type")
 
 
 ```
