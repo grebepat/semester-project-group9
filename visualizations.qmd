@@ -104,7 +104,6 @@ ggplot(raeubertochter_cor,aes(x, y, color = segment_id_cor)) +
 
 ```
 
-
 # Task 5 Alternative trajectories with hereR:route()
 
 ```{r}
@@ -210,4 +209,3 @@ tm_shape(nearest_alternative) +
 tm_shape(alternative$geometry) +
   tm_dots(col = "purple")
 ```
-
