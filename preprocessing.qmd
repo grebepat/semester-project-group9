@@ -3,11 +3,13 @@ title: prepro
 subtitle: blabla
 author: maurin und patrick
 date: "07/01/2024"
+fig_caption: yes
 format: 
   html:
     code-fold: true
     code-tools: true
     code-summary: "Show the code"
+lightbox: true
 editor: source
 df-print: paged
 execute:
@@ -69,6 +71,7 @@ p_install("grid", force = FALSE)
 p_install("raster", force = FALSE)
 p_install("gridExtra", force = FALSE)
 p_install("RColorBrewer", force = FALSE)
+p_install("mapview", force = FALSE)
 
 
 
@@ -108,6 +111,7 @@ library("png")
 library("grid")
 library("gridExtra")
 library("RColorBrewer")
+library("mapview")
 
 
 
@@ -229,7 +233,7 @@ height <- terra::rast("gis_files/dhm25_zh.tif")
 
 # Visualize raw Data
 
-```{r visualize raw data}
+```{r visualize raw data,  fig.height= 6, fig.width=9}
 
 ## Visualize the raw gps data from each messenger
 
@@ -265,6 +269,7 @@ p_raw_donner <- ggplot() +
 grid.arrange(p_raw_raeubertochter,p_raw_donner, nrow=1, ncol=2)
 
 
+
 ## Next, we want to visualize a subsample of our raw data in a smaller spatial context
 ## visualize Subsample in spatial context
 tmap_mode("plot")
@@ -294,13 +299,15 @@ subset_raeubertochter_raw <- raeubertochter_ext[seq(1, nrow(raeubertochter_ext),
 
 
 ## map including spatial context of zurich
+
+tmap_mode("view")
 tm_raw_context <- tm_shape(streets_raeubertochter, bbox = extent_raeubertochter) +
   tm_lines(lwd = "width", scale = 2.5, legend.lwd.show = FALSE) +
 tm_shape(housing_raeubertochter, bbox = extent_raeubertochter) +
   tm_polygons(col = "grey25", border.col = "white", lwd = 0.5, alpha = .9) +
 tm_shape(subset_raeubertochter_raw, bbox = extent_raeubertochter) +
   tm_symbols(size = 0.6, col = "red",  alpha = 0.7, border.col = "red", legend.col.show = FALSE) +
-  tm_layout(frame = FALSE) 
+  tm_layout(frame = FALSE)
 
 
 ## show map
@@ -310,6 +317,22 @@ print(tm_raw_context)
 ## save as a png
 tmap_save(tm_raw_context, "raeubertochter_raw.png", width = 250, height = 200, dpi = 250, units = "mm")
 
+
+
+#################################################################################
+
+## Browse trough raw_data
+
+raw_data <- all_routes[seq(1, nrow(all_routes), by = 2), ]
+
+tm_shape(raw_data) +
+  tm_symbols(size = .25, col = "messenger",  alpha = 0.7, legend.col.show = FALSE, palette = c("red", "yellow"), border.col = "black", border.lwd = 0.1) +
+  tm_layout(frame = FALSE) +
+  tm_basemap(server = "CartoDB.PositronNoLabels", alpha = 0.75) +
+  tm_view(symbol.size.fixed = F) +
+  tm_facets(by = "messenger", sync = TRUE, ncol = 2)
+
+##################################################################################
 
 ```
 
@@ -531,6 +554,21 @@ print(tm_seg_context)
 tmap_save(tm_seg_context, "raeubertochter_seg.png", width = 250, height = 200, dpi = 250, units = "mm")
 
 
+###########################################################
+
+## Browse trough segmented data
+
+
+seg_data <- all_routes_seg[seq(1, nrow(all_routes), by = 2), ]
+
+tm_shape(raw_data) +
+  tm_symbols(size = .25, col = "messenger",  alpha = 0.7, legend.col.show = FALSE, palette = "Spectral", border.col = "black", border.lwd = 0.1) +
+  tm_layout(frame = FALSE) +
+  tm_basemap(server = "CartoDB.PositronNoLabels", alpha = 0.75) +
+  tm_view( symbol.size.fixed = F) +
+  tm_facets(by = "messenger", sync = TRUE, ncol = 2)
+
+
 ```
 
 # Task 5: Lost in Transit: Tackling Tunnel GPS Blackouts for Bike Messenger
@@ -709,6 +747,13 @@ my_palette3 <- c("#9E0142", "#F46D43", "#FFFF66", "#3288BD",  "#5E4FA2")
 
 
 ## merged
+subset_raeubertochter_cor <- raeubertochter_cor[seq(1, nrow(raeubertochter_cor), by = 2), ]
+subset_raeubertochter_cor <- st_intersection(subset_raeubertochter_cor, extent_raeubertochter)
+
+subset_raeubertochter_cor$segment_id_cor <- as.numeric(subset_raeubertochter_cor$segment_id_cor)
+subset_raeubertochter_cor$segment_id_cor <- as.factor(subset_raeubertochter_cor$segment_id_cor)
+
+
 p6 <- background + 
 tm_shape(subset_raeubertochter_cor, bbox = extent_raeubertochter) +
   tm_symbols(size = 0.9, col = "segment_id_cor", palette = my_palette3, alpha = 0.9, border.col = "NA", legend.col.show = FALSE) +
@@ -799,7 +844,7 @@ alternative <- st_zm(alternative, drop = TRUE)
 
 # Visualize Original and Alternative Trajectories
 
-```{r visualize alternative routing}
+```{r visualize alternative routing,  fig.height= 3, fig.width=9, fig.align='center'}
 
 
 ## Create a new extent for this
@@ -1028,8 +1073,6 @@ filtered_df |>
 
 ```
 
-
-
 # Task 8: Map Matching
 
 ```{r map matching based on Nils method}
@@ -1065,13 +1108,17 @@ st_geometry(filtered_df) <- st_geometry(near_to)
 
 # Noch gedanken bez. dynamischeren visualisierungen machen
 
+box = st_bbox(filtered_df)
+
 tmap_mode("view")
 tm_shape(street_network) + 
   tm_lines() +
 tm_shape(nearest) + 
   tm_lines(col = "darkred", lty = 3) +
 tm_shape(filtered_df) + 
-  tm_dots(col = "type")
+  tm_dots(col = "type") +
+  tm_basemap(server = NULL) +
+    tm_view(bbox =  box) 
 
 
 ### Next, we want to visualize a subsample of our segmented data in a smaller spatial context
@@ -1568,17 +1615,16 @@ original_final <- new |>
 
 ```
 
-
 # Task 10: Results
 
 Diese Tabelle nach jedem Druchgang neu anpassen...
 
 |                           |       | original |       |       | alternative |       |       |
-|----------|---------|:--------|:--------|:--------|:--------|:--------|:--------|
+|---------|---------|:--------|:--------|:--------|:--------|:--------|:--------|
 | variable                  | unit  | min      | mean  | max   | min         | mean  | max   |
 | travel distance           | \[m\] | 584      | 2222  | 4039  | 360         | 2315  | 4089  |
 | average gradient per 100m | \[%\] | -8.88    | 0.03  | 11.8  | -11.7       | 0.05  | 11.8  |
-| max. gradient per 100m    | \[%\] | -        | 4.09  | 75.0  | -           | 3.89  | 66.7  |
+| max. gradient per 100m    | \[%\] | \-       | 4.09  | 75.0  | \-          | 3.89  | 66.7  |
 | height up                 | \[m\] | 0.68     | 19.4  | 87.7  | 0.78        | 19.1  | 83.1  |
 | height down               | \[m\] | -0.25    | -18.9 | -67.2 | -0.39       | -19.1 | -61.9 |
 
@@ -1697,7 +1743,6 @@ ggplot(df_spread, aes(x = type, y = tot_travel)) +
   ) +
   labs(title = "")
 
-unique(width_preference$width)
 
 
 
