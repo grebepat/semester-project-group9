@@ -108,7 +108,7 @@ my_palette3 <- c("#9E0142", "#F46D43", "#FFFF66", "#3288BD",  "#5E4FA2")
 
 
 # Overview
-tm1 <- tm_shape(surface, bbox = extent) +
+tm_shape(surface, bbox = extent) +
   tm_polygons(border.col = NULL, col = "art", palette = my_palette, legend.show = F, ) +
 tm_shape(housing, bbox = extent) +
   tm_polygons(col = "grey25", border.col = "white", lwd = 0.5, alpha = .9) +
@@ -132,13 +132,14 @@ tm2 <- tm_shape(subset_data, bbox = extent) +
 tmap_save(tm2, "presentation/raeubertochter_raw_transparent.png", width = 250, height = 200, dpi = 1000, units = "mm",  bg="transparent")
 
 ## With background
-tm3 <- tm_shape(streets, bbox = extent) +
+ tm_shape(streets, bbox = extent) +
   tm_lines(lwd = "width", scale = 2.5, legend.lwd.show = FALSE) +
 tm_shape(housing, bbox = extent) +
   tm_polygons(col = "grey25", border.col = "white", lwd = 0.5, alpha = .9) +
 tm_shape(subset_data, bbox = extent) +
   tm_symbols(size = 0.6, col = "red",  alpha = 0.7, border.col = "NA") +
-  tm_layout(frame = FALSE) 
+  tm_layout(frame = FALSE)  +
+  tm_basemap(server = NULL)
 
 tmap_save(tm3, "presentation/raeubertochter_raw.png", width = 250, height = 200, dpi = 1000, units = "mm")
 
@@ -333,9 +334,9 @@ polygon <- st_polygon(list(coords))
 extent4 <- st_sfc(polygon, crs = 2056)
 
 
-housing <- st_intersection(housing, extent4)
-streets <- st_intersection(streets, extent4)
-surface <- st_intersection(surface, extent4)
+housing1 <- st_intersection(housing, extent4)
+streets1 <- st_intersection(streets, extent4)
+surface1 <- st_intersection(surface, extent4)
 
 
 
@@ -344,13 +345,13 @@ surface <- st_intersection(surface, extent4)
 tmap_mode("plot")
 
 
-tm_13 <- tm_shape(streets, bbox = extent4) + 
+tm_shape(streets, bbox = extent4) + 
    tm_lines(lwd = "width", scale = 2.5, legend.lwd.show = FALSE) +
   tm_shape(housing, bbox = extent) +
   tm_polygons(col = "grey25", border.col = "white", lwd = 0.5, alpha = 0.9) +
 tm_shape(nearest) + 
   tm_lines(lwd = 1) +
-tm_shape(all_routes_seg_tunnel_cor$geometry) + 
+tm_shape(combined_vis$geometry) + 
   tm_dots(col = "purple", border.col = "purple", size = 0.6, alpha = .9, ) + 
 tm_shape(near_to) + 
   tm_dots(col = "lightblue", size = 0.6, alpha = .9, border.col = "lightblue",) +
