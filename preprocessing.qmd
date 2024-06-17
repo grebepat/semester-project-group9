@@ -24,7 +24,6 @@ execute:
 #| message: false
 #| results: 'hide'
 
-options(repos = c(CRAN = "https://cran.rstudio.com"))
 
 install.packages("pacman")
 library("pacman")
