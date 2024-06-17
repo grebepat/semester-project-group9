@@ -4,7 +4,8 @@ subtitle: i want to ride my bitschigletta
 author: maurin und patrick
 date: "07/01/2024"
 fig_caption: yes
-format: 
+output: html
+format:
   html:
     code-fold: true
     code-tools: true
@@ -1209,7 +1210,7 @@ tm_shape(filtered_df) +
 
 static visualization via tmap and in a smaller spatial context
 
-```{r visualize map matching via tmap and and small spatial context}
+```{r visualize map matching via tmap and}
 
 ### Next, we want to visualize a subsample of our segmented data in a smaller spatial context
 ## Visualize Subsample in spatial context
@@ -1260,7 +1261,6 @@ print(map_matching)
 
 
 ```
-
 
 # Problem: Uneven distribution of data points between original and alternative
 
@@ -1856,7 +1856,6 @@ ggplot(df_spread, aes(x = type, y = tot_travel)) +
 
 ```
 
-
 ## width
 
 ```{r}
@@ -1922,12 +1921,15 @@ ggplot(width_preference) +
 
 
 
-```
 
+```
 
 # Restlicher Chabis
 
 ```{r}
+
+getwd()
+
 
 ```
 
